@@ -1062,6 +1062,10 @@ func (c *Container) isRun() bool {
 	return c.containerType == containerRun
 }
 
+func (c *Container) Type() byte {
+	return c.containerType
+}
+
 // unmap creates copies of the containers data in the heap.
 //
 // This is performed when altering the container since its contents could be
