@@ -370,6 +370,33 @@ func (b *Bitmap) IntersectionCount(other *Bitmap) uint64 {
 	return n
 }
 
+// IntersectionCount returns the number of set bits that would result in an
+// intersection between b and other. It is more efficient than actually
+// intersecting the two and counting the result.
+func (b *Bitmap) IntersectionCount2(other *Bitmap) uint64 {
+	var n uint64
+	iiter, _ := b.Containers.Iterator(0)
+	jiter, _ := other.Containers.Iterator(0)
+	i, j := iiter.Next(), jiter.Next()
+	ki, ci := iiter.Value()
+	kj, cj := jiter.Value()
+	for i && j {
+		if ki < kj {
+			i = iiter.Next()
+			ki, ci = iiter.Value()
+		} else if ki > kj {
+			j = jiter.Next()
+			kj, cj = jiter.Value()
+		} else {
+			n += uint64(intersectionCount2(ci, cj))
+			i, j = iiter.Next(), jiter.Next()
+			ki, ci = iiter.Value()
+			kj, cj = jiter.Value()
+		}
+	}
+	return n
+}
+
 // Intersect returns the intersection of b and other.
 func (b *Bitmap) Intersect(other *Bitmap) *Bitmap {
 	output := NewBitmap()
@@ -1871,7 +1898,40 @@ func intersectionCount(a, b *Container) int32 {
 	}
 }
 
-func intersectionCountArrayArray(a, b *Container) (n int32) {
+func intersectionCount2(a, b *Container) int32 {
+	if a.isArray() {
+		if b.isArray() {
+			return intersectionCountArrayArray2(a, b)
+		} else if b.isRun() {
+			return intersectionCountArrayRun(a, b)
+		} else {
+			return intersectionCountArrayBitmap(a, b)
+		}
+	} else if a.isRun() {
+		if b.isArray() {
+			return intersectionCountArrayRun(b, a)
+		} else if b.isRun() {
+			return intersectionCountRunRun(a, b)
+		} else {
+			return intersectionCountBitmapRun(b, a)
+		}
+	} else {
+		if b.isArray() {
+			return intersectionCountArrayBitmap(b, a)
+		} else if b.isRun() {
+			return intersectionCountBitmapRun(a, b)
+		} else {
+			return intersectionCountBitmapBitmap(a, b)
+		}
+	}
+}
+
+// export me to watch performance change
+func (c *Container) findArray() []uint16 {
+	return c.array
+}
+
+func intersectionCountArrayArray3(a, b *Container) (n int32) {
 	na, nb := len(a.array), len(b.array)
 	for i, j := 0, 0; i < na && j < nb; {
 		va, vb := a.array[i], b.array[j]
@@ -1882,6 +1942,74 @@ func intersectionCountArrayArray(a, b *Container) (n int32) {
 		} else {
 			n++
 			i, j = i+1, j+1
+		}
+	}
+	return n
+}
+
+func doIt(s1, s2 []uint16) (n int32) {
+	if len(s1) == 0 || len(s2) == 0 {
+		return 0
+	}
+	l2 := len(s2)
+	i2 := 0
+	v2 := s2[0]
+	for _, v1 := range s1 {
+		for v2 < v1 {
+			i2++
+			if i2 >= l2 {
+				return n
+			}
+			v2 = s2[i2]
+		}
+		if v2 == v1 {
+			n++
+		}
+	}
+	return n
+}
+
+func intersectionCountArrayArray(a, b *Container) (n int32) {
+	s1, s2 := a.array, b.array
+	if len(s1) == 0 || len(s2) == 0 {
+		return 0
+	}
+	l2 := len(s2)
+	i2 := 0
+	v2 := s2[0]
+	for _, v1 := range s1 {
+		for v2 < v1 {
+			i2++
+			if i2 >= l2 {
+				return n
+			}
+			v2 = s2[i2]
+		}
+		if v2 == v1 {
+			n++
+		}
+	}
+	return n
+}
+
+func intersectionCountArrayArray2(a, b *Container) (n int32) {
+	s1, s2 := a.array, b.array
+	if len(s1) == 0 || len(s2) == 0 {
+		return 0
+	}
+	l2 := len(s2)
+	i2 := 0
+	v2 := s2[0]
+	for _, v1 := range s1 {
+		for v2 < v1 {
+			i2++
+			if i2 >= l2 {
+				return n
+			}
+			v2 = s2[i2]
+		}
+		if v2 == v1 {
+			n++
 		}
 	}
 	return n

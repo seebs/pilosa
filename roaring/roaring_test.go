@@ -1082,10 +1082,17 @@ func getBenchData(b *testing.B) *benchmarkSampleData {
 		// Build bitmap with array container.
 		data.a1 = roaring.NewFileBitmap()
 		data.a2 = roaring.NewFileBitmap()
-		for i, n := 0, 2*roaring.ArrayMaxSize/3; i < n; i++ {
-			data.a1.Add(uint64(rand.Intn(max)))
-			data.a2.Add(uint64(rand.Intn(max)))
+		for i, n := 0, roaring.ArrayMaxSize/3; i < n; i++ {
+			data.a1.Add(uint64(rand.Intn(max) % 65536))
 		}
+		for i, n := 0, roaring.ArrayMaxSize/3; i < n; i++ {
+			data.a1.Add(uint64(rand.Intn(max) % 65536))
+			data.a2.Add(uint64(rand.Intn(max) % 65536))
+		}
+		a1i := data.a1.Info()
+		a2i := data.a2.Info()
+		fmt.Printf("a1i: %v\n", a1i)
+		fmt.Printf("a2i: %v\n", a2i)
 
 		// Build bitmap with bitmap container.
 		data.b = roaring.NewFileBitmap()
@@ -1104,7 +1111,7 @@ func getBenchData(b *testing.B) *benchmarkSampleData {
 			data.r2.Add(uint64(i))
 			// break the runs up, this should produce 16 runs, which
 			// is small enough to make RLE tempting
-			if i & 0xfff == 0xfff {
+			if i&0xfff == 0xfff {
 				i += 5
 			}
 		}
@@ -1220,12 +1227,66 @@ func BenchmarkBitmap_IntersectionCount_BitmapRuns(b *testing.B) {
 	}
 }
 
-func BenchmarkBitmap_IntersectionCount_ArrayArray(b *testing.B) {
+func getContainer(b *roaring.Bitmap) *roaring.Container {
+	citer, _ := b.Containers.Iterator(0)
+	for i := 0; i < int(9999); i++ {
+		citer.Next()
+		_, c := citer.Value()
+		return c
+	}
+	return nil
+}
+
+func BenchmarkBitmap_IntersectionCount_ArrayArray1a(b *testing.B) {
+	data := getBenchData(b)
+	// Reset timer & benchmark.
+	b.ResetTimer()
+	// a1c := getContainer(data.a1)
+	// a2c := getContainer(data.a2)
+	for i := 0; i < b.N; i++ {
+		data.a1.IntersectionCount(data.a2)
+	}
+}
+
+func BenchmarkBitmap_IntersectionCount_ArrayArray2a(b *testing.B) {
+	data := getBenchData(b)
+	// Reset timer & benchmark.
+	b.ResetTimer()
+	// a1c := getContainer(data.a1)
+	// a2c := getContainer(data.a2)
+	for i := 0; i < b.N; i++ {
+		data.a1.IntersectionCount2(data.a2)
+	}
+}
+
+func BenchmarkBitmap_IntersectionCount_ArrayArray1b(b *testing.B) {
 	data := getBenchData(b)
 	// Reset timer & benchmark.
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data.a1.IntersectionCount(data.a2)
+	}
+}
+
+func BenchmarkBitmap_IntersectionCount_ArrayArray2b(b *testing.B) {
+	data := getBenchData(b)
+	// Reset timer & benchmark.
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		data.a2.IntersectionCount2(data.a1)
+	}
+}
+
+func BenchmarkBitmap_IntersectionCount_ArrayArray3(b *testing.B) {
+	data := getBenchData(b)
+	// Reset timer & benchmark.
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v1 := data.a1.IntersectionCount(data.a2)
+		v2 := data.a1.IntersectionCount2(data.a2)
+		if v1 != v2 {
+			b.Fatalf("oops: v1 %d, v2 %d", v1, v2)
+		}
 	}
 }
 
