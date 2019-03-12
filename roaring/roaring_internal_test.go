@@ -3653,3 +3653,46 @@ func TestDirectAddNVsAdd(t *testing.T) {
 	}
 
 }
+
+func BenchmarkUnionInPlaceRegression(b *testing.B) {
+	initial := make([]uint64, 0, 10100)
+	a1 := make([]uint64, 0, 10000)
+	a2 := make([]uint64, 0, 10000)
+	for i := uint64(0); i < 1<<30; i += 100000 {
+		initial = append(initial, i)
+		a1 = append(a1, i+67000)
+		a2 = append(a2, i/2)
+	}
+	a1BM := NewBTreeBitmap(a1...)
+	a2BM := NewBTreeBitmap(a2...)
+	b.Run("Union1", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			bm := NewBTreeBitmap(initial...)
+			bm = bm.Union(a1BM)
+		}
+	})
+	b.Run("UnionInPlace1", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			bm := NewBTreeBitmap(initial...)
+			bm.UnionInPlace(a1BM)
+		}
+	})
+
+	b.Run("Union2", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			bm := NewBTreeBitmap(initial...)
+			bm = bm.Union(a1BM)
+			bm = bm.Union(a2BM)
+		}
+	})
+	b.Run("UnionInPlace2", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			bm := NewBTreeBitmap(initial...)
+			bm.UnionInPlace(a1BM, a2BM)
+		}
+	})
+}
