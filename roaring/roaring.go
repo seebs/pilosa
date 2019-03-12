@@ -714,23 +714,20 @@ func (b *Bitmap) unionInPlace(others ...*Bitmap) {
 				summaryStats = bitmapIters[i:].calculateSummaryStats(iKey)
 			)
 
-			if summaryStats.isOnlyContainerWithKey {
-				// TODO(rartoul): We can avoid these clones if we can determine
-				// if the container is coming from an immutable bitmap and we
-				// know that we can mark the target bitmap as immutable as well.
-				target.Containers.Put(iKey, iContainer.Clone())
-				bitmapIters[i].handled = true
-				continue
-			}
-
-			// There was more than one container across the bitmaps with key iKey
-			// so we need to calculate a union.
+			// if the set contains a max-range container, we can simplify to that.
 			if summaryStats.hasMaxRange {
+				container := target.Containers.Get(iKey)
+				if container != nil && container.n == maxContainerVal+1 {
+					// we already had this; mark those containers as handled
+					// and move on.
+					bitmapIters.markItersWithCurrentKeyAsHandled(i, iKey)
+					continue
+				}
 				// One (or more) of the containers represented the maximum possible
 				// range that a container can store, so instead of calculating a
 				// union we can generate an RLE container that represents the entire
 				// range.
-				container := &Container{
+				container = &Container{
 					runs:          []interval16{{start: 0, last: maxContainerVal}},
 					containerType: containerRun,
 					n:             maxContainerVal + 1,
@@ -740,49 +737,76 @@ func (b *Bitmap) unionInPlace(others ...*Bitmap) {
 				continue
 			}
 
-			// Use a bitmap container for the target bitmap, and union everything
-			// into it.
-			//
-			// TODO(rartoul): Add another conditional case for n < ArrayMaxSize
-			// (or some fraction of that value) to avoid allocating expensive
-			// bitmaps when unioning many low-density array containers, but this
-			// will require writing a union in place algorithm for an array container
-			// that accepts multiple different containers to union into it for
-			// efficiency.
 			container := target.Containers.Get(iKey)
-			// If target already has a bitmap container for iKey then we can reuse that,
-			// otherwise we have to allocate a new one or convert the existing container
-			// into a bitmap container.
+			containerOffset := 0
 			if container == nil {
-				buf := make([]uint64, bitmapN)
-				ob := buf[:bitmapN]
-				container = &Container{
-					bitmap:        ob,
-					n:             0,
-					containerType: containerBitmap,
+				// if there's only one container to union in, we
+				// can just clone it and be done
+				if summaryStats.c == 1 {
+					statsHit("unionInPlace/reuse")
+					target.Containers.Put(iKey, iContainer.Clone())
+					bitmapIters[i].handled = true
+					continue
 				}
-			} else if container.isArray() {
-				container.arrayToBitmap()
-			} else if container.isRun() {
-				container.runToBitmap()
+				statsHit("unionInPlace/clone")
+				// otherwise, we clone the first one, then union the rest of them
+				container = iContainer.Clone()
+				containerOffset = 1
+			} else {
+				statsHit("unionInPlace/exist")
 			}
 
-			// Once we've acquired a bitmap container (either by reusing the existing one
-			// or allocating a new one) then the last step is to iterate through all the
-			// other containers to see which ones have the same key, and union all of them
-			// into the target bitmap container. Only need to loop starting from i because
-			// anything previous to that has already been handled.
-			for j := i; j < len(bitmapIters); j++ {
+			// Now we union everything together. In many cases, this will mean
+			// converting a non-bitmap container to a bitmap, and then unioning things
+			// in, but we can specialize away from that in some cases.
+			//
+			// We iterate through the other Containers [plural] checking to see whether
+			// any of them have a Container [singular] with the same key to merge
+			// in. We only need to check i and higher, because anything lower would
+			// already be handled.
+			//
+			// If the target didn't previously have this index, we cloned the
+			// first container we found for it, so we will not then union that one
+			// in.
+			for j := i + containerOffset; j < len(bitmapIters); j++ {
 				jIter := bitmapIters[j]
 				jKey, jContainer := jIter.iter.Value()
 
 				if iKey == jKey {
-					if jContainer.isArray() {
-						unionBitmapArrayInPlace(container, jContainer)
-					} else if jContainer.isRun() {
-						unionBitmapRunInPlace(container, jContainer)
-					} else {
-						unionBitmapBitmapInPlace(container, jContainer)
+					switch container.containerType {
+					case containerBitmap:
+						switch jContainer.containerType {
+						case containerBitmap:
+							unionBitmapBitmapInPlace(container, jContainer)
+						case containerArray:
+							unionBitmapArrayInPlace(container, jContainer)
+						case containerRun:
+							unionBitmapRunInPlace(container, jContainer)
+
+						}
+					case containerArray:
+						switch jContainer.containerType {
+						case containerBitmap:
+							container.arrayToBitmap()
+							unionBitmapBitmapInPlace(container, jContainer)
+						case containerArray:
+							unionArrayArrayInPlace(container, jContainer)
+						case containerRun:
+							container.arrayToBitmap()
+							unionBitmapRunInPlace(container, jContainer)
+						}
+					case containerRun:
+						switch jContainer.containerType {
+						case containerBitmap:
+							container.runToBitmap()
+							unionBitmapBitmapInPlace(container, jContainer)
+						case containerArray:
+							container.runToBitmap()
+							unionBitmapArrayInPlace(container, jContainer)
+						case containerRun:
+							container.runToBitmap()
+							unionBitmapRunInPlace(container, jContainer)
+						}
 					}
 					bitmapIters[j].handled = true
 				}
@@ -2711,6 +2735,51 @@ func unionArrayArray(a, b *Container) *Container {
 	return output
 }
 
+// unionArrayArrayInPlace does what it sounds like -- tries to combine
+// the two arrays in-place. It does not try to ensure that the result is
+// of a good array size, so it could be up to twice that size, temporarily.
+func unionArrayArrayInPlace(a, b *Container) *Container {
+	statsHit("union/ArrayArrayInPlace")
+	na, nb := len(a.array), len(b.array)
+	output := make([]uint16, na+nb)
+	outN := 0
+	for i, j := 0, 0; ; {
+		if i >= na && j >= nb {
+			break
+		} else if i < na && j >= nb {
+			copy(output[outN:], a.array[i:])
+			outN += na - i
+			break
+		} else if i >= na && j < nb {
+			copy(output[outN:], b.array[j:])
+			outN += nb - j
+			break
+		}
+
+		va, vb := a.array[i], b.array[j]
+		if va < vb {
+			output[outN] = va
+			outN++
+			i++
+		} else if va > vb {
+			output[outN] = vb
+			outN++
+			j++
+		} else {
+			output[outN] = va
+			outN++
+			i++
+			j++
+		}
+	}
+	a.array = output[:outN]
+	a.n = int32(outN)
+	if a.n > ArrayMaxSize {
+		a.optimize()
+	}
+	return a
+}
+
 // unionArrayRun optimistically assumes that the result will be a run container,
 // and converts to a bitmap or array container afterwards if necessary.
 func unionArrayRun(a, b *Container) *Container {
@@ -4318,7 +4387,7 @@ func (w handledIters) calculateSummaryStats(key uint64) containerUnionSummarySta
 		currKey, currContainer := iter.iter.Value()
 
 		if key == currKey {
-			summary.isOnlyContainerWithKey = false
+			summary.c++
 			summary.n += currContainer.n
 
 			if currContainer.n == maxContainerVal+1 {
@@ -4342,10 +4411,8 @@ type containerUnionSummaryStats struct {
 	// result in very inflated values, but it allows us to avoid allocating
 	// expensive bitmaps when unioning many low density containers.
 	n int32
-	// Whether any other is the only container across all the bitmaps
-	// with the specified key. If true, we can skip all the unioning logic
-	// and just clone the container into target.
-	isOnlyContainerWithKey bool
+	// Containers found with this key. May be inaccurate if hasMaxRange is true.
+	c int
 	// Whether any of the containers with the specified keys are storing every possible
 	// value that they can. If so, we can short-circuit all the unioning logic and use
 	// a RLE container with a single value in it. This is an optimization to
