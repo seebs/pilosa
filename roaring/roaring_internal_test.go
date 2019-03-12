@@ -3669,7 +3669,7 @@ func BenchmarkUnionInPlaceRegression(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			bm := NewBTreeBitmap(initial...)
-			bm = bm.Union(a1BM)
+			_ = bm.Union(a1BM)
 		}
 	})
 	b.Run("UnionInPlace1", func(b *testing.B) {
@@ -3685,7 +3685,7 @@ func BenchmarkUnionInPlaceRegression(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			bm := NewBTreeBitmap(initial...)
 			bm = bm.Union(a1BM)
-			bm = bm.Union(a2BM)
+			_ = bm.Union(a2BM)
 		}
 	})
 	b.Run("UnionInPlace2", func(b *testing.B) {

@@ -2738,7 +2738,7 @@ func unionArrayArray(a, b *Container) *Container {
 // unionArrayArrayInPlace does what it sounds like -- tries to combine
 // the two arrays in-place. It does not try to ensure that the result is
 // of a good array size, so it could be up to twice that size, temporarily.
-func unionArrayArrayInPlace(a, b *Container) *Container {
+func unionArrayArrayInPlace(a, b *Container) {
 	statsHit("union/ArrayArrayInPlace")
 	na, nb := len(a.array), len(b.array)
 	output := make([]uint16, na+nb)
@@ -2777,7 +2777,6 @@ func unionArrayArrayInPlace(a, b *Container) *Container {
 	if a.n > ArrayMaxSize {
 		a.optimize()
 	}
-	return a
 }
 
 // unionArrayRun optimistically assumes that the result will be a run container,
@@ -4405,14 +4404,14 @@ func (w handledIters) calculateSummaryStats(key uint64) containerUnionSummarySta
 // that share the same key so we can make smarter union strategy
 // decisions.
 type containerUnionSummaryStats struct {
+	// Containers found with this key. May be inaccurate if hasMaxRange is true.
+	c int
 	// Estimated cardinality of the union of all containers with the same
 	// key across all bitmaps. This calculation is very rough as we just sum
 	// the cardinality of the container across the different bitmaps which could
 	// result in very inflated values, but it allows us to avoid allocating
 	// expensive bitmaps when unioning many low density containers.
 	n int32
-	// Containers found with this key. May be inaccurate if hasMaxRange is true.
-	c int
 	// Whether any of the containers with the specified keys are storing every possible
 	// value that they can. If so, we can short-circuit all the unioning logic and use
 	// a RLE container with a single value in it. This is an optimization to
