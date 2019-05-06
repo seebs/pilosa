@@ -376,7 +376,7 @@ func NewServer(opts ...ServerOption) (*Server, error) {
 
 // Open opens and initializes the server.
 func (s *Server) Open() error {
-	s.logger.Printf("open server")
+	s.logger.Printf("open server [verifying version]")
 
 	// Log startup
 	err := s.holder.logStartup()
