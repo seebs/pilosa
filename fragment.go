@@ -265,6 +265,11 @@ func (f *fragment) openStorage() error {
 				return fmt.Errorf("madvise: %s", err)
 			}
 		}
+		var x int
+		// touch every page
+		for i := 0; i < len(data); i += 4096 {
+			x += int(data[i])
+		}
 
 		if err := f.storage.UnmarshalBinary(data); err != nil {
 			return fmt.Errorf("unmarshal storage: file=%s, err=%s", f.file.Name(), err)
