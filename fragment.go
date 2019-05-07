@@ -249,7 +249,7 @@ func (f *fragment) openStorage() error {
 		}
 	} else {
 		// Mmap the underlying file so it can be zero copied.
-		data, err := syswrap.Mmap(int(f.file.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+		data, err := syswrap.Mmap(int(f.file.Fd()), 0, int(fi.Size()), syscall.PROT_READ, syscall.MAP_PRIVATE)
 		if err == syswrap.ErrMaxMapCountReached {
 			f.Logger.Debugf("maximum number of maps reached, reading file instead")
 			data, err = ioutil.ReadAll(file)
