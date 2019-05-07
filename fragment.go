@@ -172,10 +172,6 @@ func (f *fragment) Open() error {
 		if err := f.openStorage(); err != nil {
 			return errors.Wrap(err, "opening storage")
 		}
-		// hackery: force a flush on initial open if we have an op log
-		if f.opN > 0 {
-			unprotectedWriteToFragment(f, f.storage)
-		}
 
 		// Fill cache with rows persisted to disk.
 		f.Logger.Debugf("open cache for index/field/view/fragment: %s/%s/%s/%d", f.index, f.field, f.view, f.shard)
