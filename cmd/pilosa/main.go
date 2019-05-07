@@ -20,11 +20,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/pilosa/pilosa/cmd"
 )
 
 func main() {
+	runtime.MemProfileRate = 1
 	rootCmd := cmd.NewRootCommand(os.Stdin, os.Stdout, os.Stderr)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
