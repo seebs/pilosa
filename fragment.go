@@ -85,6 +85,9 @@ const (
 	trueRowID  = uint64(1)
 )
 
+var mdsLock sync.Mutex
+var MappedDataSize int64
+
 // fragment represents the intersection of a field and shard in an index.
 type fragment struct {
 	mu sync.RWMutex
@@ -133,6 +136,8 @@ type fragment struct {
 	mutexVector vector
 
 	stats stats.StatsClient
+
+	MappedDataSize int64
 }
 
 // newFragment returns a new instance of Fragment.
@@ -254,6 +259,10 @@ func (f *fragment) openStorage() error {
 		} else if err != nil {
 			return errors.Wrap(err, "mmap failed")
 		} else {
+			mdsLock.Lock()
+			f.MappedDataSize = fi.Size()
+			MappedDataSize += f.MappedDataSize
+			mdsLock.Unlock()
 			f.storageData = data
 			// Advise the kernel that the mmap is accessed randomly.
 			if err := madvise(f.storageData, syscall.MADV_RANDOM); err != nil {
@@ -372,6 +381,9 @@ func (f *fragment) closeStorage() error {
 
 	// Unmap the file.
 	if f.storageData != nil {
+		mdsLock.Lock()
+		MappedDataSize -= f.MappedDataSize
+		mdsLock.Unlock()
 		if err := syswrap.Munmap(f.storageData); err != nil {
 			return fmt.Errorf("munmap: %s", err)
 		}

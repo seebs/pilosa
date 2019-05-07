@@ -1215,6 +1215,8 @@ func (api *API) Info() serverInfo {
 	physicalCores, logicalCores, _ := si.CPUCores()
 	mhz, _ := si.CPUMHz()
 	mem, _ := si.MemTotal()
+	mdsLock.Lock()
+	defer mdsLock.Unlock()
 	return serverInfo{
 		ShardWidth:       ShardWidth,
 		CPUPhysicalCores: physicalCores,
@@ -1222,6 +1224,7 @@ func (api *API) Info() serverInfo {
 		CPUMHz:           mhz,
 		CPUType:          si.CPUModel(),
 		Memory:           mem,
+		Mapped:           MappedDataSize,
 	}
 }
 
@@ -1263,6 +1266,7 @@ type serverInfo struct {
 	CPUPhysicalCores int    `json:"cpuPhysicalCores"`
 	CPULogicalCores  int    `json:"cpuLogicalCores"`
 	CPUMHz           int    `json:"cpuMHz"`
+	Mapped           int64  `json:"mapped"`
 }
 
 type apiMethod int
