@@ -457,6 +457,11 @@ func (s *simpleCache) Add(id uint64, b *Row) {
 	s.cache[id] = b
 }
 
+type nopBitmapCache struct{}
+
+func (n *nopBitmapCache) Add(uint64, *Row)          {}
+func (n *nopBitmapCache) Fetch(uint64) (*Row, bool) { return nil, false }
+
 // nopCache represents a no-op Cache implementation.
 type nopCache struct {
 	stats stats.StatsClient

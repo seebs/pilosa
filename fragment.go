@@ -281,7 +281,7 @@ func (f *fragment) openStorage() error {
 
 	// Attach the file to the bitmap to act as a write-ahead log.
 	f.storage.OpWriter = f.file
-	f.rowCache = &simpleCache{make(map[uint64]*Row)}
+	f.rowCache = &nopBitmapCache{}
 
 	return nil
 
