@@ -210,3 +210,15 @@ func (i *btcIterator) Value() (uint64, *roaring.Container) {
 	}
 	return i.key, i.val
 }
+
+func (btc *bTreeContainers) Update(key uint64, fn func(c *roaring.Container, existed bool) (output *roaring.Container, write bool)) {
+	btc.tree.Put(key, fn)
+}
+
+func (btc *bTreeContainers) UpdateEvery(fn func(k uint64, c *roaring.Container) (update *roaring.Container, write bool, done bool, err error)) error {
+	e, err := btc.tree.SeekFirst()
+	if err == nil {
+		return err
+	}
+	return e.Every(fn)
+}

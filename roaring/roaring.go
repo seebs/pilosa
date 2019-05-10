@@ -112,6 +112,29 @@ type Containers interface {
 	// Repair will repair the cardinality of any containers whose cardinality were corrupted
 	// due to optimized operations.
 	Repair()
+
+	// Update does an in-place modification to a container, possibly replacing it
+	// with a new container. See the btree "Put" method for more explanation.
+	// fn is called with the existing pointer (or nil), and existed tells fn
+	// whether or not such a container existed. It should then return a
+	// container pointer, and true if it wants that container pointer inserted
+	// in the Containers object at that key.
+	//
+	// Example: If a container is currently marked as shared/mapped, and you want
+	// to modify it, you would clone the container, then return the new container
+	// and true. If no container existed, you'd make a container and return
+	// that and true. But if a container isn't shared/mapped, or you don't end
+	// up modifying it (bit already in correct state), you return false.
+	//
+	// This lets us do a single search of the containers structure rather than
+	// two for these fairly common operations.
+	Update(key uint64, fn func(c *Container, existed bool) (update *Container, write bool))
+
+	// UpdateEvery performs an Update operation on the entire selection,
+	// essentially performing an iteration which can replace containers.
+	// It stops when done is true or err is non-nil, and returns an error
+	// if one occurred.
+	UpdateEvery(fn func(k uint64, c *Container) (update *Container, write bool, done bool, err error)) error
 }
 
 type ContainerIterator interface {
@@ -167,6 +190,7 @@ func (b *Bitmap) Clone() *Bitmap {
 // AddN (though be aware that it modifies 'a' in place).
 func (b *Bitmap) Add(a ...uint64) (changed bool, err error) {
 	changed = false
+	count := 0
 	for _, v := range a {
 		// Create an add operation.
 		op := &op{typ: opTypeAdd, value: v}
@@ -179,9 +203,10 @@ func (b *Bitmap) Add(a ...uint64) (changed bool, err error) {
 		// Apply to the in-memory bitmap.
 		if b.DirectAdd(v) {
 			changed = true
+			count++
 		}
-	}
 
+	}
 	return changed, nil
 }
 
@@ -230,27 +255,46 @@ func (b *Bitmap) DirectRemoveN(a ...uint64) (changed int) {
 // container level operation across a list of values and return the number of
 // trues while modifying the list of values in place to contain the
 // true-returning values in order.
-func (b *Bitmap) directOpN(op func(c *Container, v uint16) bool, a ...uint64) (changed int) {
-	hb := uint64(0xFFFFFFFFFFFFFFFF) // impossible sentinel value
-	var cont *Container
+func (b *Bitmap) directOpN(op func(c *Container, v uint16) (bool, *Container), a ...uint64) (changed int) {
 	for _, v := range a {
-		if newhb := highbits(v); newhb != hb {
-			hb = newhb
-			cont = b.Containers.GetOrCreate(hb)
-		}
-		if op(cont, lowbits(v)) {
-			a[changed] = v
-			changed++
-		}
+		// this is insanely slow and needs to be rethought
+		b.Containers.Update(highbits(v), func(c *Container, existed bool) (*Container, bool) {
+			if c == nil {
+				c = NewContainerArray(nil)
+				// horrid hack: force NewC to get created
+				// if a change is made.
+				c.shared = true
+			}
+			change, newC := op(c, lowbits(v))
+			if change {
+				a[changed] = v
+				changed++
+			}
+			if newC != nil {
+				return newC, true
+			}
+			return c, !existed
+		})
 	}
 	return changed
 }
 
 // DirectAdd adds a value to the bitmap by bypassing the op log. TODO(2.0)
 // deprecate in favor of DirectAddN.
-func (b *Bitmap) DirectAdd(v uint64) bool {
-	cont := b.Containers.GetOrCreate(highbits(v))
-	return cont.add(lowbits(v))
+func (b *Bitmap) DirectAdd(v uint64) (changed bool) {
+	b.Containers.Update(highbits(v), func(c *Container, existed bool) (newC *Container, write bool) {
+		if c == nil {
+			c = NewContainerArray([]uint16{lowbits(v)})
+			changed = true
+			return c, true
+		}
+		changed, newC = c.add(lowbits(v))
+		if newC != nil {
+			return newC, true
+		}
+		return c, false
+	})
+	return changed
 }
 
 // Contains returns true if v is in the bitmap.
@@ -306,13 +350,18 @@ func (b *Bitmap) RemoveN(a ...uint64) (changed int, err error) {
 	return changed, nil
 }
 
-func (b *Bitmap) remove(v uint64) bool {
-	c := b.Containers.Get(highbits(v))
-	if c == nil {
-		return false
-	}
-	// TODO - do nil check inside c.remove?
-	return c.remove(lowbits(v))
+func (b *Bitmap) remove(v uint64) (changed bool) {
+	b.Containers.Update(highbits(v), func(c *Container, existed bool) (newC *Container, write bool) {
+		if c == nil {
+			return nil, false
+		}
+		changed, newC = c.remove(lowbits(v))
+		if changed && newC != nil {
+			return newC, true
+		}
+		return nil, false
+	})
+	return changed
 }
 
 // Max returns the highest value in the bitmap.
@@ -466,6 +515,17 @@ func (b *Bitmap) OffsetRange(offset, start, end uint64) *Bitmap {
 		other.Containers.Put(off+(k-hi0), c)
 	}
 	return other
+}
+
+// MarkShared indicates that the containers in a bitmap have been stashed
+// somewhere, such as the row cache.
+func (b *Bitmap) MarkShared() {
+	// we don't have to write back to the containers object, we're updating
+	// in place to mark that these are being watched.
+	b.Containers.UpdateEvery(func(k uint64, c *Container) (update *Container, write bool, done bool, err error) {
+		c.shared = true
+		return nil, false, false, nil
+	})
 }
 
 // container returns the container with the given key.
@@ -752,9 +812,9 @@ func (b *Bitmap) unionInPlace(others ...*Bitmap) {
 					statsHit("unionInPlace/convertToBitmap")
 					switch tContainer.typ {
 					case containerArray:
-						tContainer.arrayToBitmap()
+						tContainer = tContainer.arrayToBitmap()
 					case containerRun:
-						tContainer.runToBitmap()
+						tContainer = tContainer.runToBitmap()
 					}
 				}
 			}
@@ -765,7 +825,7 @@ func (b *Bitmap) unionInPlace(others ...*Bitmap) {
 				jKey, jContainer := iter.iter.Value()
 
 				if iKey == jKey {
-					tContainer.unionInPlace(jContainer)
+					tContainer = tContainer.unionInPlace(jContainer)
 					// "iter" is a local copy from the range
 					// loop, not the actual slice member.
 					itersToUnion[j].handled = true
@@ -900,10 +960,15 @@ func (b *Bitmap) countEmptyContainers() int {
 
 // Optimize converts array and bitmap containers to run containers as necessary.
 func (b *Bitmap) Optimize() {
-	citer, _ := b.Containers.Iterator(0)
-	for citer.Next() {
-		_, c := citer.Value()
-		c.optimize()
+	err := b.Containers.UpdateEvery(func(k uint64, c *Container) (update *Container, write bool, done bool, err error) {
+		_, newC := c.optimize()
+		if newC != nil {
+			return newC, true, false, nil
+		}
+		return nil, false, false, nil
+	})
+	if err != nil {
+		fmt.Printf("optimize: %v\n", err)
 	}
 }
 
@@ -1497,73 +1562,77 @@ func (c *Container) runCountRange(start, end int32) (n int32) {
 }
 
 // add adds a value to the container.
-func (c *Container) add(v uint16) (added bool) {
+func (c *Container) add(v uint16) (added bool, newC *Container) {
 
 	if c.isArray() {
-		added = c.arrayAdd(v)
+		added, newC = c.arrayAdd(v)
 	} else if c.isRun() {
-		added = c.runAdd(v)
+		added, newC = c.runAdd(v)
 	} else {
-		added = c.bitmapAdd(v)
+		added, newC = c.bitmapAdd(v)
+	}
+	if newC != nil {
+		c = newC
 	}
 	if added {
 		c.n++
 	}
-	return added
+	return added, newC
 }
 
-func (c *Container) arrayAdd(v uint16) bool {
+func (c *Container) arrayAdd(v uint16) (changed bool, newC *Container) {
 	// Optimize appending to the end of an array container.
 	array := c.array()
 	if c.n > 0 && c.n < ArrayMaxSize && c.isArray() && array[c.n-1] < v {
 		statsHit("arrayAdd/append")
-		c.unmapArray()
+		c, newC = c.unmapArray()
 		array = append(c.array(), v)
 		c.setArray(array)
-		return true
+		return true, newC
 	}
 
 	// Find index of the integer in the container. Exit if it already exists.
 	i := search32(array, v)
 	if i >= 0 {
-		return false
+		return false, nil
 	}
 
 	// Convert to a bitmap container if too many values are in an array container.
 	if c.n >= ArrayMaxSize {
 		statsHit("arrayAdd/arrayToBitmap")
-		c.arrayToBitmap()
-		return c.bitmapAdd(v)
+		newC = c.arrayToBitmap()
+		changed, _ = newC.bitmapAdd(v)
+		return changed, newC
 	}
 
 	// Otherwise insert into array.
 	statsHit("arrayAdd/insert")
-	c.unmapArray()
+	c, newC = c.unmapArray()
 	i = -i - 1
 	array = append(c.array(), 0)
 	copy(array[i+1:], array[i:])
 	array[i] = v
 	c.setArray(array)
-	return true
+	return true, newC
 
 }
 
-func (c *Container) bitmapAdd(v uint16) bool {
+func (c *Container) bitmapAdd(v uint16) (changed bool, newC *Container) {
 	if c.bitmapContains(v) {
-		return false
+		return false, nil
 	}
-	c.unmapBitmap()
+	c, newC = c.unmapBitmap()
 	c.bitmap()[v/64] |= (1 << uint64(v%64))
-	return true
+	return true, newC
 }
 
-func (c *Container) runAdd(v uint16) bool {
+func (c *Container) runAdd(v uint16) (changed bool, newC *Container) {
 	runs := c.runs()
 
 	if len(runs) == 0 {
-		c.unmapRun()
+		c, newC = c.unmapRun()
 		c.setRuns([]interval16{{start: v, last: v}})
-		return true
+		return true, newC
 	}
 
 	i := sort.Search(len(runs),
@@ -1575,10 +1644,10 @@ func (c *Container) runAdd(v uint16) bool {
 
 	iv := runs[i]
 	if v >= iv.start && iv.last >= v {
-		return false
+		return false, nil
 	}
 
-	c.unmapRun()
+	c, newC = c.unmapRun()
 	runs = c.runs()
 	if iv.last < v {
 		if iv.last == v-1 {
@@ -1592,7 +1661,7 @@ func (c *Container) runAdd(v uint16) bool {
 			runs[i-1].last = iv.last
 			runs = append(runs[:i], runs[i+1:]...)
 			c.setRuns(runs)
-			return true
+			return true, newC
 		}
 		// just before an interval
 		runs[i].start--
@@ -1605,7 +1674,7 @@ func (c *Container) runAdd(v uint16) bool {
 		runs = append(runs[:i], append([]interval16{newIv}, runs[i:]...)...)
 	}
 	c.setRuns(runs)
-	return true
+	return true, newC
 }
 
 // Contains returns true if v is in the container.
@@ -1663,10 +1732,10 @@ func (c *Container) countRuns() (r int32) {
 
 // optimize converts the container to the type which will take up the least
 // amount of space.
-func (c *Container) optimize() {
+func (c *Container) optimize() (oldC, newC *Container) {
 	if c.n == 0 {
 		statsHit("optimize/empty")
-		return
+		return c, nil
 	}
 	runs := c.countRuns()
 
@@ -1683,75 +1752,82 @@ func (c *Container) optimize() {
 	if c.isArray() {
 		if newType == containerBitmap {
 			statsHit("optimize/arrayToBitmap")
-			c.arrayToBitmap()
+			c = c.arrayToBitmap()
+			newC = c
 		} else if newType == containerRun {
 			statsHit("optimize/arrayToRun")
-			c.arrayToRun(runs)
+			c = c.arrayToRun(runs)
+			newC = c
 		} else {
 			statsHit("optimize/arrayUnchanged")
 		}
 	} else if c.isBitmap() {
 		if newType == containerArray {
 			statsHit("optimize/bitmapToArray")
-			c.bitmapToArray()
+			c = c.bitmapToArray()
+			newC = c
 		} else if newType == containerRun {
 			statsHit("optimize/bitmapToRun")
-			c.bitmapToRun(runs)
+			c = c.bitmapToRun(runs)
+			newC = c
 		} else {
 			statsHit("optimize/bitmapUnchanged")
 		}
 	} else if c.isRun() {
 		if newType == containerBitmap {
 			statsHit("optimize/runToBitmap")
-			c.runToBitmap()
+			c = c.runToBitmap()
+			newC = c
 		} else if newType == containerArray {
 			statsHit("optimize/runToArray")
-			c.runToArray()
+			c = c.runToArray()
+			newC = c
 		} else {
 			statsHit("optimize/runUnchanged")
 		}
 	}
+	return c, newC
 }
 
 // unionInPlace does not necessarily preserve container's N; it's expected
 // to be used when running a sequence of unions, after which you should
 // call Repair(). (As of this writing, that only matters for bitmaps.)
-func (c *Container) unionInPlace(other *Container) {
+func (c *Container) unionInPlace(other *Container) *Container {
+	var newC *Container
 	switch c.typ {
 	case containerBitmap:
 		switch other.typ {
 		case containerBitmap:
-			unionBitmapBitmapInPlace(c, other)
+			return unionBitmapBitmapInPlace(c, other)
 		case containerArray:
-			unionBitmapArrayInPlace(c, other)
+			return unionBitmapArrayInPlace(c, other)
 		case containerRun:
-			unionBitmapRunInPlace(c, other)
+			return unionBitmapRunInPlace(c, other)
 
 		}
 	case containerArray:
 		switch other.typ {
 		case containerBitmap:
-			c.arrayToBitmap()
-			unionBitmapBitmapInPlace(c, other)
+			newC = c.arrayToBitmap()
+			return unionBitmapBitmapInPlace(newC, other)
 		case containerArray:
-			unionArrayArrayInPlace(c, other)
+			return unionArrayArrayInPlace(c, other)
 		case containerRun:
-			c.arrayToBitmap()
-			unionBitmapRunInPlace(c, other)
+			newC = c.arrayToBitmap()
+			return unionBitmapRunInPlace(newC, other)
 		}
 	case containerRun:
+		newC = c.runToBitmap()
 		switch other.typ {
 		case containerBitmap:
-			c.runToBitmap()
-			unionBitmapBitmapInPlace(c, other)
+			return unionBitmapBitmapInPlace(newC, other)
 		case containerArray:
-			c.runToBitmap()
-			unionBitmapArrayInPlace(c, other)
+			return unionBitmapArrayInPlace(newC, other)
 		case containerRun:
-			c.runToBitmap()
-			unionBitmapRunInPlace(c, other)
+			return unionBitmapRunInPlace(newC, other)
 		}
 	}
+	return c
 }
 
 func (c *Container) arrayContains(v uint16) bool {
@@ -1782,37 +1858,37 @@ func (c *Container) runContains(v uint16) bool {
 }
 
 // remove removes a value from the container.
-func (c *Container) remove(v uint16) (removed bool) {
+func (c *Container) remove(v uint16) (removed bool, newC *Container) {
 	if c.isArray() {
-		removed = c.arrayRemove(v)
+		removed, newC = c.arrayRemove(v)
 	} else if c.isRun() {
-		removed = c.runRemove(v)
+		removed, newC = c.runRemove(v)
 	} else {
-		removed = c.bitmapRemove(v)
+		removed, newC = c.bitmapRemove(v)
 	}
-	return removed
+	return removed, newC
 }
 
-func (c *Container) arrayRemove(v uint16) bool {
+func (c *Container) arrayRemove(v uint16) (removed bool, newC *Container) {
 	array := c.array()
 	i := search32(array, v)
 	if i < 0 {
-		return false
+		return false, nil
 	}
-	c.unmapArray()
+	c, newC = c.unmapArray()
 	array = c.array()
 
 	array = append(array[:i], array[i+1:]...)
 	c.n--
 	c.setArray(array)
-	return true
+	return true, newC
 }
 
-func (c *Container) bitmapRemove(v uint16) bool {
+func (c *Container) bitmapRemove(v uint16) (removed bool, newC *Container) {
 	if !c.bitmapContains(v) {
-		return false
+		return false, nil
 	}
-	c.unmapBitmap()
+	c, newC = c.unmapBitmap()
 
 	// Lower count and remove element.
 	c.bitmap()[v/64] &^= (uint64(1) << uint(v%64))
@@ -1821,19 +1897,19 @@ func (c *Container) bitmapRemove(v uint16) bool {
 	// Convert to array if we go below the threshold.
 	if c.n == ArrayMaxSize {
 		statsHit("bitmapRemove/bitmapToArray")
-		c.bitmapToArray()
+		newC = c.bitmapToArray()
 	}
-	return true
+	return true, newC
 }
 
 // runRemove removes v from a run container, and returns true if v was removed.
-func (c *Container) runRemove(v uint16) bool {
+func (c *Container) runRemove(v uint16) (removed bool, newC *Container) {
 	runs := c.runs()
 	i, contains := binSearchRuns(v, runs)
 	if !contains {
-		return false
+		return false, nil
 	}
-	c.unmapRun()
+	c, newC = c.unmapRun()
 	runs = c.runs()
 	if v == runs[i].last && v == runs[i].start {
 		runs = append(runs[:i], runs[i+1:]...)
@@ -1851,7 +1927,7 @@ func (c *Container) runRemove(v uint16) bool {
 	}
 	c.n--
 	c.setRuns(runs)
-	return true
+	return true, newC
 }
 
 // max returns the maximum value in the container.
@@ -1896,18 +1972,18 @@ func (c *Container) runMax() uint16 {
 	return runs[len(runs)-1].last
 }
 
-// bitmapToArray converts from bitmap format to array format.
-func (c *Container) bitmapToArray() {
+// bitmapToArray converts from bitmap format to array format, returning the
+// new container.
+func (c *Container) bitmapToArray() (newC *Container) {
 	statsHit("bitmapToArray")
 	bitmap := c.bitmap()
-	c.setBitmap(nil)
-	c.typ = containerArray
-	c.mapped = false
+	// We create a new container in case c is shared. We could make
+	// this conditional, but the logic is trickier to be sure of, and
+	// type conversions aren't super common.
 
 	// return early if empty
 	if c.n == 0 {
-		c.setArray(nil)
-		return
+		return NewContainerArray(nil)
 	}
 	n := int32(0)
 
@@ -1930,63 +2006,55 @@ func (c *Container) bitmapToArray() {
 			panic("bitmap has fewer bits set than container.n")
 		}
 	}
-	c.setArray(array)
+	newC = NewContainerArray(array)
+	newC.shared = false
+	return newC
 }
 
 // arrayToBitmap converts from array format to bitmap format.
-func (c *Container) arrayToBitmap() {
+func (c *Container) arrayToBitmap() (newC *Container) {
 	statsHit("arrayToBitmap")
-	array := c.array()
-	c.typ = containerBitmap
-	bitmap := make([]uint64, bitmapN)
-	c.setBitmap(bitmap)
-	c.mapped = false
 
-	// return early if empty
 	if c.n == 0 {
-		return
+		return NewContainerBitmap(0, nil)
 	}
 
-	for _, v := range array {
+	bitmap := make([]uint64, bitmapN)
+	for _, v := range c.array() {
 		bitmap[int(v)/64] |= (uint64(1) << uint(v%64))
 	}
+	newC = NewContainerBitmap(c.n, bitmap)
+	newC.shared = false
+	return newC
 }
 
 // runToBitmap converts from RLE format to bitmap format.
-func (c *Container) runToBitmap() {
+func (c *Container) runToBitmap() (newC *Container) {
 	statsHit("runToBitmap")
-	runs := c.runs()
-	bitmap := make([]uint64, bitmapN)
-	c.typ = containerBitmap
-	c.setBitmap(bitmap)
 
-	c.mapped = false
-
-	// return early if empty
 	if c.n == 0 {
-		return
+		return NewContainerBitmap(0, nil)
 	}
-
-	for _, r := range runs {
+	bitmap := make([]uint64, bitmapN)
+	for _, r := range c.runs() {
 		// TODO this can be ~64x faster for long runs by setting maxBitmap instead of single bits
 		//note v must be int or will overflow
 		for v := int(r.start); v <= int(r.last); v++ {
 			bitmap[v/64] |= (uint64(1) << uint(v%64))
 		}
 	}
+	return NewContainerBitmap(c.n, bitmap)
 }
 
 // bitmapToRun converts from bitmap format to RLE format.
-func (c *Container) bitmapToRun(numRuns int32) {
+func (c *Container) bitmapToRun(numRuns int32) (newC *Container) {
 	statsHit("bitmapToRun")
-	bitmap := c.bitmap()
-	c.mapped = false
-	c.typ = containerRun
+
 	// return early if empty
 	if c.n == 0 {
-		c.setRuns(nil)
-		return
+		return NewContainerRun(nil)
 	}
+	bitmap := c.bitmap()
 	if numRuns == 0 {
 		numRuns = bitmapCountRuns(bitmap)
 	}
@@ -2030,20 +2098,17 @@ func (c *Container) bitmapToRun(numRuns int32) {
 		// pad LSBs with 0s
 		current = current & (current + 1)
 	}
-	c.setRuns(runs)
+	return NewContainerRun(runs)
 }
 
 // arrayToRun converts from array format to RLE format.
-func (c *Container) arrayToRun(numRuns int32) {
+func (c *Container) arrayToRun(numRuns int32) (newC *Container) {
 	statsHit("arrayToRun")
-	array := c.array()
-	c.typ = containerRun
-	c.mapped = false
 	// return early if empty
 	if c.n == 0 {
-		c.setRuns(nil)
-		return
+		return NewContainerRun(nil)
 	}
+	array := c.array()
 	if numRuns == 0 {
 		numRuns = arrayCountRuns(array)
 	}
@@ -2059,25 +2124,21 @@ func (c *Container) arrayToRun(numRuns int32) {
 	}
 	// append final run
 	runs = append(runs, interval16{start, array[c.n-1]})
-	c.setRuns(runs)
+	return NewContainerRun(runs)
 }
 
 // runToArray converts from RLE format to array format.
-func (c *Container) runToArray() {
+func (c *Container) runToArray() (newC *Container) {
 	statsHit("runToArray")
-	runs := c.runs()
-	c.typ = containerArray
-	c.mapped = false
 
 	// return early if empty
 	if c.n == 0 {
-		c.setArray(nil)
-		return
+		return NewContainerArray(nil)
 	}
 
 	array := make([]uint16, c.n)
 	n := int32(0)
-	for _, r := range runs {
+	for _, r := range c.runs() {
 		for v := int(r.start); v <= int(r.last); v++ {
 			array[n] = uint16(v)
 			n++
@@ -2088,7 +2149,7 @@ func (c *Container) runToArray() {
 			panic("run has fewer bits set than container.n")
 		}
 	}
-	c.setArray(array)
+	return NewContainerArray(array)
 }
 
 // Clone returns a copy of c.
@@ -2113,6 +2174,9 @@ func (c *Container) Clone() (out *Container) {
 		copy(runs, cRuns)
 		out = NewContainerRun(runs)
 	}
+	// we know this data isn't being shared elsewhere, even though by
+	// default NewContainerX assumes that provided data might be shared.
+	out.shared = false
 	// this should probably never happen
 	if roaringParanoia {
 		if out.n != out.count() {
@@ -2200,16 +2264,9 @@ func (c *Container) info() containerInfo {
 		info.Type = "bitmap"
 		info.Alloc = len(c.bitmap()) * 8 // sizeof(uint64)
 	}
-
-	if c.mapped {
-		if c.isArray() {
-			info.Pointer = unsafe.Pointer(&c.array()[0])
-		} else if c.isRun() {
-			info.Pointer = unsafe.Pointer(&c.runs()[0])
-		} else {
-			info.Pointer = unsafe.Pointer(&c.bitmap()[0])
-		}
-	}
+	// note, this used to be provided only for mmapped things, but now
+	// it's always available.
+	info.Pointer = unsafe.Pointer(c.pointer)
 
 	return info
 }
@@ -2293,7 +2350,7 @@ func flipArray(b *Container) *Container {
 	statsHit("flipArray")
 	// TODO: actually implement this
 	x := b.Clone()
-	x.arrayToBitmap()
+	x = x.arrayToBitmap()
 	return flipBitmap(x)
 }
 
@@ -2314,7 +2371,7 @@ func flipRun(b *Container) *Container {
 	statsHit("flipRun")
 	// TODO: actually implement this
 	x := b.Clone()
-	x.runToBitmap()
+	x = x.runToBitmap()
 	return flipBitmap(x)
 }
 
@@ -2730,7 +2787,7 @@ func unionArrayArray(a, b *Container) *Container {
 // unionArrayArrayInPlace does what it sounds like -- tries to combine
 // the two arrays in-place. It does not try to ensure that the result is
 // of a good array size, so it could be up to twice that size, temporarily.
-func unionArrayArrayInPlace(a, b *Container) {
+func unionArrayArrayInPlace(a, b *Container) *Container {
 	statsHit("union/ArrayArrayInPlace")
 	aa, ab := a.array(), b.array()
 	na, nb := len(aa), len(ab)
@@ -2768,8 +2825,12 @@ func unionArrayArrayInPlace(a, b *Container) {
 	a.setArray(output[:outN])
 	a.n = int32(outN)
 	if a.n > ArrayMaxSize {
-		a.optimize()
+		_, newA := a.optimize()
+		if newA != nil {
+			return newA
+		}
 	}
+	return a
 }
 
 // unionArrayRun optimistically assumes that the result will be a run container,
@@ -2800,9 +2861,9 @@ func unionArrayRun(a, b *Container) *Container {
 		}
 	}
 	if output.n < ArrayMaxSize {
-		output.runToArray()
+		output = output.runToArray()
 	} else if len(output.runs()) > runMaxSize {
-		output.runToBitmap()
+		output = output.runToBitmap()
 	}
 	return output
 }
@@ -2865,7 +2926,7 @@ func unionRunRun(a, b *Container) *Container {
 		}
 	}
 	if len(output.runs()) > runMaxSize {
-		output.runToBitmap()
+		output = output.runToBitmap()
 	}
 	return output
 }
@@ -2888,13 +2949,14 @@ func unionBitmapRun(a, b *Container) *Container {
 
 // unions the run b into the bitmap a, mutating a in place. The n value of
 // a will need to be repaired after the fact.
-func unionBitmapRunInPlace(a, b *Container) {
-	a.unmapBitmap()
+func unionBitmapRunInPlace(a, b *Container) *Container {
+	a, _ = a.unmapBitmap()
 	bitmap := a.bitmap()
 	statsHit("union/BitmapRun")
 	for _, run := range b.runs() {
 		bitmapSetRangeIgnoreN(bitmap, uint64(run.start), uint64(run.last)+1)
 	}
+	return a
 }
 
 const maxBitmap = 0xFFFFFFFFFFFFFFFF
@@ -2990,7 +3052,7 @@ func (c *Container) bitmapZeroRange(i, j uint64) {
 }
 
 func (c *Container) equals(c2 *Container) bool {
-	if c.mapped != c2.mapped || c.typ != c2.typ || c.n != c2.n {
+	if c.shared != c2.shared || c.typ != c2.typ || c.n != c2.n {
 		return false
 	}
 	if c.typ == containerArray {
@@ -3043,12 +3105,13 @@ func unionArrayBitmap(a, b *Container) *Container {
 
 // unions array b into bitmap a, mutating a in place. The n value
 // of a will need to be repaired after the fact.
-func unionBitmapArrayInPlace(a, b *Container) {
-	a.unmapBitmap()
+func unionBitmapArrayInPlace(a, b *Container) *Container {
+	a, _ = a.unmapBitmap()
 	bitmap := a.bitmap()
 	for _, v := range b.array() {
 		bitmap[v>>6] |= (uint64(1) << (v % 64))
 	}
+	return a
 }
 
 func unionBitmapBitmap(a, b *Container) *Container {
@@ -3074,9 +3137,8 @@ func unionBitmapBitmap(a, b *Container) *Container {
 
 // unions bitmap b into bitmap a, mutating a in place. The n value of
 // a will need to be repaired after the fact.
-func unionBitmapBitmapInPlace(a, b *Container) {
-
-	a.unmapBitmap()
+func unionBitmapBitmapInPlace(a, b *Container) *Container {
+	a, _ = a.unmapBitmap()
 
 	// local variables added to prevent BCE checks in loop
 	// see https://go101.org/article/bounds-check-elimination.html
@@ -3093,6 +3155,7 @@ func unionBitmapBitmapInPlace(a, b *Container) {
 		ab[i+2] |= bb[i+2]
 		ab[i+3] |= bb[i+3]
 	}
+	return a
 }
 
 func difference(a, b *Container) *Container {
@@ -3126,20 +3189,19 @@ func difference(a, b *Container) *Container {
 // differenceArrayArray computes the difference bween two arrays.
 func differenceArrayArray(a, b *Container) *Container {
 	statsHit("difference/ArrayArray")
-	output := NewContainerArray(nil)
+	output := make([]uint16, 0, a.n)
 	aa, ab := a.array(), b.array()
 	na, nb := len(aa), len(ab)
 	for i, j := 0, 0; i < na; {
 		va := aa[i]
 		if j >= nb {
-			output.add(va)
-			i++
-			continue
+			output = append(output, aa[i:]...)
+			break
 		}
 
 		vb := ab[j]
 		if va < vb {
-			output.add(va)
+			output = append(output, va)
 			i++
 		} else if va > vb {
 			j++
@@ -3147,7 +3209,7 @@ func differenceArrayArray(a, b *Container) *Container {
 			i, j = i+1, j+1
 		}
 	}
-	return output
+	return NewContainerArray(output)
 }
 
 // differenceArrayRun computes the difference of an array from a run.
@@ -3160,6 +3222,7 @@ func differenceArrayRun(a, b *Container) *Container {
 	}
 
 	output := NewContainerArray(make([]uint16, 0, a.n))
+	output.shared = false
 	// cardinality upper bound: card(A)
 
 	i := 0 // array index
@@ -3171,7 +3234,10 @@ func differenceArrayRun(a, b *Container) *Container {
 
 		// keep all array elements before beginning of runs
 		if aa[i] < rb[j].start {
-			output.add(aa[i])
+			_, newC := output.add(aa[i])
+			if newC != nil {
+				output = newC
+			}
 			i++
 			continue
 		}
@@ -3278,7 +3344,7 @@ RUNLOOP:
 		}
 	}
 	output := NewContainerRun(runs)
-	output.optimize()
+	output, _ = output.optimize()
 	return output
 }
 
@@ -3336,9 +3402,9 @@ func differenceRunBitmap(a, b *Container) *Container {
 
 	output.setRuns(runs)
 	if output.n < ArrayMaxSize && int32(len(runs)) > output.n/2 {
-		output.runToArray()
+		output = output.runToArray()
 	} else if len(runs) > runMaxSize {
-		output.runToBitmap()
+		output = output.runToBitmap()
 	}
 	return output
 }
@@ -3436,7 +3502,7 @@ func differenceBitmapArray(a, b *Container) *Container {
 		}
 	}
 	if output.n < ArrayMaxSize {
-		output.bitmapToArray()
+		output = output.bitmapToArray()
 	}
 	return output
 }
@@ -3461,7 +3527,7 @@ func differenceBitmapBitmap(a, b *Container) *Container {
 
 	output := NewContainerBitmap(n, ob)
 	if output.n < ArrayMaxSize {
-		output.bitmapToArray()
+		output = output.bitmapToArray()
 	}
 	return output
 }
@@ -3499,23 +3565,27 @@ func xorArrayArray(a, b *Container) *Container {
 	output := NewContainerArray(nil)
 	aa, ab := a.array(), b.array()
 	na, nb := len(aa), len(ab)
+	var newC *Container
 	for i, j := 0, 0; i < na || j < nb; {
+		if newC != nil {
+			output = newC
+		}
 		if i < na && j >= nb {
-			output.add(aa[i])
+			_, newC = output.add(aa[i])
 			i++
 			continue
 		} else if i >= na && j < nb {
-			output.add(ab[j])
+			_, newC = output.add(ab[j])
 			j++
 			continue
 		}
 
 		va, vb := aa[i], ab[j]
 		if va < vb {
-			output.add(va)
+			_, newC = output.add(va)
 			i++
 		} else if va > vb {
-			output.add(vb)
+			_, newC = output.add(vb)
 			j++
 		} else { //==
 			i++
@@ -3528,18 +3598,22 @@ func xorArrayArray(a, b *Container) *Container {
 func xorArrayBitmap(a, b *Container) *Container {
 	statsHit("xor/ArrayBitmap")
 	output := b.Clone()
+	var newC *Container
 	for _, v := range a.array() {
 		if b.bitmapContains(v) {
-			output.remove(v)
+			_, newC = output.remove(v)
 		} else {
-			output.add(v)
+			_, newC = output.add(v)
+		}
+		if newC != nil {
+			output = newC
 		}
 	}
 
 	// It's possible that output was converted from bitmap to array in output.remove()
 	// so we only do this conversion if output is still a bitmap container.
 	if output.typ == containerBitmap && output.count() < ArrayMaxSize {
-		output.bitmapToArray()
+		output = output.bitmapToArray()
 	}
 
 	return output
@@ -3565,7 +3639,7 @@ func xorBitmapBitmap(a, b *Container) *Container {
 
 	output := NewContainerBitmap(n, ob)
 	if output.count() < ArrayMaxSize {
-		output.bitmapToArray()
+		output = output.bitmapToArray()
 	}
 	return output
 }
@@ -3949,9 +4023,9 @@ func xorArrayRun(a, b *Container) *Container {
 		}
 	}
 	if output.n < ArrayMaxSize {
-		output.runToArray()
+		output = output.runToArray()
 	} else if len(output.runs()) > runMaxSize {
-		output.runToBitmap()
+		output = output.runToBitmap()
 	}
 	return output
 }
@@ -4094,9 +4168,9 @@ func xorRunRun(a, b *Container) *Container {
 
 	l := len(output.runs())
 	if output.n < ArrayMaxSize && int32(l) > output.n/2 {
-		output.runToArray()
+		output = output.runToArray()
 	} else if l > runMaxSize {
-		output.runToBitmap()
+		output = output.runToBitmap()
 	}
 	return output
 }

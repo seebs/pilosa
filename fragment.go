@@ -390,19 +390,22 @@ func (f *fragment) closeStorage() error {
 func (f *fragment) row(rowID uint64) *Row {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.unprotectedRow(rowID)
+	return f.unprotectedRow(rowID, true)
 }
 
 // unprotectedRow returns a row from the row cache if available or from storage
 // (updating the cache).
-func (f *fragment) unprotectedRow(rowID uint64) *Row {
+func (f *fragment) unprotectedRow(rowID uint64, stash bool) *Row {
 	r, ok := f.rowCache.Fetch(rowID)
 	if ok && r != nil {
 		return r
 	}
 
 	row := f.rowFromStorage(rowID)
-	f.rowCache.Add(rowID, row)
+	if stash {
+		f.rowCache.Add(rowID, row)
+		row.MarkShared()
+	}
 	return row
 }
 
@@ -421,7 +424,7 @@ func (f *fragment) rowFromStorage(rowID uint64) *Row {
 	// out at any point.
 	row := &Row{
 		segments: []rowSegment{{
-			data:     *data.Clone(),
+			data:     *data,
 			shard:    f.shard,
 			writable: false, // this Row will probably be cached and shared, so it must be read only.
 		}},
@@ -486,6 +489,8 @@ func (f *fragment) unprotectedSetBit(rowID, columnID uint64) (changed bool, err 
 		return changed, nil
 	}
 
+	f.rowCache.Add(rowID, nil)
+
 	// Invalidate block checksum.
 	delete(f.checksums, int(rowID/HashBlockSize))
 
@@ -495,8 +500,7 @@ func (f *fragment) unprotectedSetBit(rowID, columnID uint64) (changed bool, err 
 	}
 
 	// Get the row from row cache or fragment.storage.
-	row := f.unprotectedRow(rowID)
-	row.SetBit(columnID)
+	row := f.unprotectedRow(rowID, false)
 
 	// Update the cache.
 	f.cache.Add(rowID, row.Count())
@@ -547,6 +551,8 @@ func (f *fragment) unprotectedClearBit(rowID, columnID uint64) (changed bool, er
 		return changed, nil
 	}
 
+	f.rowCache.Add(rowID, nil)
+
 	// Invalidate block checksum.
 	delete(f.checksums, int(rowID/HashBlockSize))
 
@@ -556,8 +562,7 @@ func (f *fragment) unprotectedClearBit(rowID, columnID uint64) (changed bool, er
 	}
 
 	// Get the row from cache or fragment.storage.
-	row := f.unprotectedRow(rowID)
-	row.clearBit(columnID)
+	row := f.unprotectedRow(rowID, false)
 
 	// Update the cache.
 	f.cache.Add(rowID, row.Count())
@@ -1663,9 +1668,9 @@ func (f *fragment) importPositions(set, clear []uint64, rowSet map[uint64]struct
 		f.cache.BulkAdd(rowID, n)
 
 		if smallWrite {
-			if _, ok := f.rowCache.Fetch(rowID); ok { // we won't update the rowCache if it wasn't already in there.
-				f.rowCache.Add(rowID, f.rowFromStorage(rowID))
-			}
+			// drop cache for now, we don't want to mark things as
+			// cached until someone actually wants to read them.
+			f.rowCache.Add(rowID, nil)
 		}
 	}
 

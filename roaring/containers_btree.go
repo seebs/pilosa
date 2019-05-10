@@ -59,23 +59,29 @@ func (btc *bTreeContainers) Get(key uint64) *Container {
 func (btc *bTreeContainers) Put(key uint64, c *Container) {
 	// If a mapped container is added to the tree, reset the
 	// lastContainer cache so that the cache is not pointing
-	// at a read-only mmap.
-	if c.Mapped() {
+	// at a read-only mmap. This logic relies on the assumption
+	// that we only ever add shared containers to a bTreeContainers
+	// when reading from storage, so it could be wrong.
+	if c.shared {
 		btc.lastContainer = nil
 	}
 	btc.tree.Set(key, c)
 }
 
+func (btc *bTreeContainers) Update(key uint64, fn func(c *Container, existed bool) (output *Container, write bool)) {
+	btc.tree.Put(key, fn)
+}
+
 func (u updater) update(oldV *Container, exists bool) (*Container, bool) {
 	// update the existing container
 	if exists {
-		oldV.Update(u.typ, u.n, u.mapped)
+		oldV.Update(u.typ, u.n, u.shared)
 		return oldV, false
 	}
 	cont := NewContainer()
 	cont.typ = u.typ
 	cont.n = u.n
-	cont.mapped = u.mapped
+	cont.shared = u.shared
 	return cont, true
 }
 
@@ -84,11 +90,11 @@ type updater struct {
 	key    uint64
 	n      int32
 	typ    byte
-	mapped bool
+	shared bool
 }
 
-func (btc *bTreeContainers) PutContainerValues(key uint64, typ byte, n int, mapped bool) {
-	a := updater{key, int32(n), typ, mapped}
+func (btc *bTreeContainers) PutContainerValues(key uint64, typ byte, n int, shared bool) {
+	a := updater{key, int32(n), typ, shared}
 	btc.tree.Put(key, a.update)
 }
 
@@ -178,6 +184,21 @@ func (btc *bTreeContainers) Repair() {
 		c.Repair()
 		_, c, err = e.Next()
 	}
+}
+
+func (btc *bTreeContainers) UpdateEvery(fn func(k uint64, c *Container) (update *Container, write bool, done bool, err error)) error {
+	e, err := btc.tree.SeekFirst()
+	if err == io.EOF {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	ret := e.Every(fn)
+	if ret == io.EOF {
+		return nil
+	}
+	return ret
 }
 
 type btcIterator struct {

@@ -57,6 +57,14 @@ func (r *Row) IsEmpty() bool {
 	return true
 }
 
+// MarkShared records that all of the segments are being shared -- for instance,
+// they're being kept in the row cache.
+func (r *Row) MarkShared() {
+	for _, s := range r.segments {
+		s.data.MarkShared()
+	}
+}
+
 // Merge merges data from other into r.
 func (r *Row) Merge(other *Row) {
 	var segments []rowSegment

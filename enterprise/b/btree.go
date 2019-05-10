@@ -951,3 +951,42 @@ func (e *enumerator) prev() error {
 	}
 	return e.err
 }
+
+// Every iterates over every value in the iterator, performing the equivalent
+// of a Put; if the provided function returns true for the write value, the
+// returned value should replace the value given. It stops when done is true
+// or err is non-nil. If the function returns an error, this does not set
+// an enumerator-level error.
+func (e *enumerator) Every(fn func(k uint64, v *roaring.Container) (nv *roaring.Container, write bool, done bool, fnErr error)) (err error) {
+	if err = e.err; err != nil {
+		return err
+	}
+	// note: we check this only once per call to Every.
+	if e.ver != e.t.ver {
+		f, _ := e.t.Seek(e.k)
+		*e = *f
+		f.Close()
+	}
+	for e.q != nil {
+		for e.i < e.q.c {
+			i := e.q.d[e.i]
+			k, v := i.k, i.v
+			e.k, e.hit = k, true
+			newV, write, done, fnErr := fn(k, v)
+			if write {
+				e.q.d[e.i].v = newV
+			}
+			if fnErr != nil {
+				return fnErr
+			}
+			if done {
+				return nil
+			}
+			e.i++
+		}
+		// move to start of next container
+		e.q, e.i = e.q.n, 0
+	}
+	err, e.err = io.EOF, io.EOF
+	return err
+}

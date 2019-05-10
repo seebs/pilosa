@@ -39,7 +39,7 @@ type Container struct {
 	pointer  *uint16                  // the data pointer
 	len, cap int32                    // length and cap
 	n        int32                    // number of integers in container
-	mapped   bool                     // mapped directly to a byte slice when true
+	shared   bool                     // storage may be shared, copy-on-write
 	typ      byte                     // array, bitmap, or run
 	data     [stashedArraySize]uint16 // immediate data for small arrays or runs
 }
@@ -57,16 +57,18 @@ func NewContainer() *Container {
 // an empty one if provided bitmap is nil. If the provided bitmap is too short,
 // it will be padded.
 func NewContainerBitmap(n int32, bitmap []uint64) *Container {
+	c := &Container{typ: containerBitmap, n: n, shared: bitmap != nil}
 	if bitmap == nil {
 		bitmap = make([]uint64, bitmapN)
 	}
 	// pad to required length
 	if len(bitmap) < bitmapN {
+		// No longer using the source data, so we're safe.
+		c.shared = false
 		bm2 := make([]uint64, bitmapN)
 		copy(bm2, bitmap)
 		bitmap = bm2
 	}
-	c := &Container{typ: containerBitmap, n: n}
 	c.setBitmap(bitmap)
 	return c
 }
@@ -74,7 +76,7 @@ func NewContainerBitmap(n int32, bitmap []uint64) *Container {
 // NewContainerArray returns an array using the provided set of values. It's
 // okay if the slice is nil; that's a length of zero.
 func NewContainerArray(set []uint16) *Container {
-	c := &Container{typ: containerArray, n: int32(len(set))}
+	c := &Container{typ: containerArray, n: int32(len(set)), shared: set != nil}
 	c.setArray(set)
 	return c
 }
@@ -82,19 +84,12 @@ func NewContainerArray(set []uint16) *Container {
 // NewContainerRun creates a new run array using a provided (possibly nil)
 // slice of intervals.
 func NewContainerRun(set []interval16) *Container {
-	c := &Container{typ: containerRun}
+	c := &Container{typ: containerRun, shared: set != nil}
 	c.setRuns(set)
 	for _, run := range set {
 		c.n += int32(run.last-run.start) + 1
 	}
 	return c
-}
-
-// Mapped returns the internal mapped field, which indicates whether the
-// slice's backing store is believed to be associated with unwriteable
-// mmapped space.
-func (c *Container) Mapped() bool {
-	return c.mapped
 }
 
 // N returns the internal n field.
@@ -134,7 +129,10 @@ func (c *Container) setArray(array []uint16) {
 	if len(array) <= stashedArraySize {
 		copy(c.data[:stashedArraySize], array)
 		c.pointer, c.len, c.cap = (*uint16)(unsafe.Pointer(&c.data[0])), int32(len(array)), stashedArraySize
-		c.mapped = false // this is no longer using a hypothetical mmapped input array
+		// note: if this was previously actually-shared, we shouldn't have gotten
+		// here. but it could have been set by NewContainerArray guessing that
+		// a provided input array might be shared, in which case we don't care.
+		c.shared = false
 		return
 	}
 	c.pointer, c.len, c.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Len), int32(h.Cap)
@@ -197,7 +195,7 @@ func (c *Container) setRuns(runs []interval16) {
 		newRuns := *(*[]interval16)(unsafe.Pointer(&reflect.SliceHeader{Data: uintptr(unsafe.Pointer(&c.data[0])), Len: stashedRunSize, Cap: stashedRunSize}))
 		copy(newRuns, runs)
 		c.pointer, c.len, c.cap = (*uint16)(unsafe.Pointer(&c.data[0])), int32(len(runs)), stashedRunSize
-		c.mapped = false // this is no longer using a hypothetical mmapped input array
+		c.shared = false
 		return
 	}
 	c.pointer, c.len, c.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Len), int32(h.Cap)
@@ -205,10 +203,10 @@ func (c *Container) setRuns(runs []interval16) {
 }
 
 // Update updates the container
-func (c *Container) Update(typ byte, n int32, mapped bool) {
+func (c *Container) Update(typ byte, n int32, shared bool) {
 	c.typ = typ
 	c.n = n
-	c.mapped = mapped
+	c.shared = shared
 	// we don't know that any existing slice is usable, so let's ditch it
 	switch c.typ {
 	case containerArray:
@@ -235,43 +233,56 @@ func (c *Container) isRun() bool {
 	return c.typ == containerRun
 }
 
+// Mapped indicates whether the container might be mmapped, but is possibly
+// no longer sane. Consider it deprecated.
+func (c *Container) Mapped() bool {
+	return c.shared
+}
+
 // unmapArray ensures that the container is not using mmapped storage.
-func (c *Container) unmapArray() {
-	if !c.mapped {
-		return
+func (c *Container) unmapArray() (oldC, newC *Container) {
+	if !c.shared {
+		return c, nil
 	}
+	newC = &Container{typ: containerArray, len: c.len, cap: c.cap, n: c.n}
 	array := c.array()
 	tmp := make([]uint16, c.len)
 	copy(tmp, array)
 	h := (*reflect.SliceHeader)(unsafe.Pointer(&tmp))
-	c.pointer, c.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
+	newC.pointer, newC.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
 	runtime.KeepAlive(&tmp)
-	c.mapped = false
+	newC.shared = false
+	return newC, newC
 }
 
 // unmapBitmap ensures that the container is not using mmapped storage.
-func (c *Container) unmapBitmap() {
-	if !c.mapped {
-		return
+func (c *Container) unmapBitmap() (oldC, newC *Container) {
+	if !c.shared {
+		return c, nil
 	}
+	newC = &Container{typ: containerBitmap, len: c.len, n: c.n}
 	bitmap := c.bitmap()
 	tmp := make([]uint64, c.len)
 	copy(tmp, bitmap)
 	h := (*reflect.SliceHeader)(unsafe.Pointer(&tmp))
-	c.pointer, c.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
+	newC.pointer, newC.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
 	runtime.KeepAlive(&tmp)
-	c.mapped = false
+	newC.shared = false
+	return newC, newC
 }
 
 // unmapRun ensures that the container is not using mmapped storage.
-func (c *Container) unmapRun() {
-	if !c.mapped {
-		return
+func (c *Container) unmapRun() (oldC, newC *Container) {
+	if !c.shared {
+		return c, nil
 	}
+	newC = &Container{typ: containerRun, len: c.len, n: c.n}
 	runs := c.runs()
 	tmp := make([]interval16, c.len)
 	copy(tmp, runs)
 	h := (*reflect.SliceHeader)(unsafe.Pointer(&tmp))
-	c.pointer, c.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
-	c.mapped = false
+	newC.pointer, newC.cap = (*uint16)(unsafe.Pointer(h.Data)), int32(h.Cap)
+	runtime.KeepAlive(&tmp)
+	newC.shared = false
+	return newC, newC
 }
