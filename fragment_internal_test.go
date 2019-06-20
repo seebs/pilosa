@@ -2483,6 +2483,10 @@ func (f *fragment) Clean(t testing.TB) {
 	if errc != nil || errf != nil {
 		t.Fatal("cleaning up fragment: ", errc, errf, errp)
 	}
+	if f.snapshotQueue != nil {
+		close(f.snapshotQueue)
+		f.snapshotQueue = nil
+	}
 	// not all fragments have cache files
 	if errp != nil && !os.IsNotExist(errp) {
 		t.Fatalf("cleaning up fragment cache: %v", errp)
@@ -2534,6 +2538,7 @@ func mustOpenFragmentFlags(index, field, view string, shard uint64, cacheType st
 	f.RowAttrStore = &memAttrStore{
 		store: make(map[uint64]map[string]interface{}),
 	}
+	f.snapshotQueue = newSnapshotQueue(1, nil)
 
 	if err := f.Open(); err != nil {
 		panic(err)

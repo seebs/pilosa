@@ -180,6 +180,24 @@ func newFragment(path, index, field, view string, shard uint64, flags byte) *fra
 // cachePath returns the path to the fragment's cache data.
 func (f *fragment) cachePath() string { return f.path + cacheExt }
 
+// newSnapshotQueue makes a new snapshot queue, of depth N, and spawns a
+// goroutine for it.
+func newSnapshotQueue(n int, l logger.Logger) chan *fragment {
+	ch := make(chan *fragment, n)
+	go snapshotQueueWorker(ch, l)
+	return ch
+}
+
+func snapshotQueueWorker(snapshotQueue chan *fragment, l logger.Logger) {
+	for f := range snapshotQueue {
+		err := f.Snapshot()
+		if err != nil {
+			l.Printf("snapshot error: %v", err)
+		}
+		f.snapshotCond.Broadcast()
+	}
+}
+
 // enqueueSnapshot requests that the fragment be snapshotted at some point
 // in the future, if this has not already been requested. Call this only when
 // the mutex is held.

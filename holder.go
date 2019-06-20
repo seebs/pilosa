@@ -135,9 +135,6 @@ func (h *Holder) Open() error {
 	// Reset closing in case Holder is being reopened.
 	h.closing = make(chan struct{})
 
-	// 100 is completely arbitrary
-	h.snapshotQueue = make(chan *fragment, 100)
-
 	h.setFileLimit()
 
 	h.Logger.Printf("open holder path: %s", h.Path)
@@ -156,6 +153,11 @@ func (h *Holder) Open() error {
 	if err != nil {
 		return errors.Wrap(err, "reading directory")
 	}
+
+	// Run snapshots asynchronously. The snapshotQueue will have a background
+	// task associated with it which flushes it and waits until this channel
+	// is closed, so we should always close this channel when done.
+	h.snapshotQueue = newSnapshotQueue(100, h.Logger)
 
 	for _, fi := range fis {
 		// Skip files or hidden directories.
@@ -188,25 +190,11 @@ func (h *Holder) Open() error {
 	// Periodically flush cache.
 	h.wg.Add(1)
 	go func() { defer h.wg.Done(); h.monitorCacheFlush() }()
-	// Run snapshots asynchronously. This goroutine does *not*
-	// automatically close when we start to close the holder; it waits
-	// until everything else is done.
-	go h.snapshotQueueWorker()
 
 	h.Stats.Open()
 
 	h.opened.Close()
 	return nil
-}
-
-func (h *Holder) snapshotQueueWorker() {
-	for f := range h.snapshotQueue {
-		err := f.Snapshot()
-		if err != nil {
-			h.Logger.Printf("snapshot error: %v", err)
-		}
-		f.snapshotCond.Broadcast()
-	}
 }
 
 // Close closes all open fragments.
