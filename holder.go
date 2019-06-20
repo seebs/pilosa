@@ -78,6 +78,8 @@ type Holder struct {
 	cacheFlushInterval time.Duration
 
 	Logger logger.Logger
+
+	snapshotQueue chan *fragment
 }
 
 // lockedChan looks a little ridiculous admittedly, but exists for good reason.
@@ -133,6 +135,9 @@ func (h *Holder) Open() error {
 	// Reset closing in case Holder is being reopened.
 	h.closing = make(chan struct{})
 
+	// 100 is completely arbitrary
+	h.snapshotQueue = make(chan *fragment, 100)
+
 	h.setFileLimit()
 
 	h.Logger.Printf("open holder path: %s", h.Path)
@@ -183,11 +188,25 @@ func (h *Holder) Open() error {
 	// Periodically flush cache.
 	h.wg.Add(1)
 	go func() { defer h.wg.Done(); h.monitorCacheFlush() }()
+	// Run snapshots asynchronously. This goroutine does *not*
+	// automatically close when we start to close the holder; it waits
+	// until everything else is done.
+	go h.snapshotQueueWorker()
 
 	h.Stats.Open()
 
 	h.opened.Close()
 	return nil
+}
+
+func (h *Holder) snapshotQueueWorker() {
+	for f := range h.snapshotQueue {
+		err := f.Snapshot()
+		if err != nil {
+			h.Logger.Printf("snapshot error: %v", err)
+		}
+		f.snapshotCond.Broadcast()
+	}
 }
 
 // Close closes all open fragments.
@@ -202,6 +221,11 @@ func (h *Holder) Close() error {
 		if err := index.Close(); err != nil {
 			return errors.Wrap(err, "closing index")
 		}
+	}
+	if h.snapshotQueue != nil {
+		close(h.snapshotQueue)
+		// assuming the snapshotQueueWorker has already started, this is safe.
+		h.snapshotQueue = nil
 	}
 
 	if h.translateFile != nil {
@@ -425,6 +449,7 @@ func (h *Holder) newIndex(path, name string) (*Index, error) {
 	index.broadcaster = h.broadcaster
 	index.newAttrStore = h.NewAttrStore
 	index.columnAttrs = h.NewAttrStore(filepath.Join(index.path, ".data"))
+	index.snapshotQueue = h.snapshotQueue
 	return index, nil
 }
 
