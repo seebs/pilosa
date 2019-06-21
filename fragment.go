@@ -2201,83 +2201,32 @@ func (f *fragment) importValue(columnIDs []uint64, values []int64, bitDepth uint
 // https://github.com/RoaringBitmap/RoaringFormatSpec or from pilosa's version
 // of the roaring format. The cache is updated to reflect the new data.
 func (f *fragment) importRoaring(ctx context.Context, data []byte, clear bool) error {
+	rowSize := uint64(1 << shardVsContainerExponent)
 	span, ctx := tracing.StartSpanFromContext(ctx, "fragment.importRoaring")
 	defer span.Finish()
 	span, ctx = tracing.StartSpanFromContext(ctx, "importRoaring.AcquireFragmentLock")
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	span.Finish()
-	bm := roaring.NewBTreeBitmap()
-	span, ctx = tracing.StartSpanFromContext(ctx, "importRoaring.UnmarshalBinary")
-	err := bm.UnmarshalBinary(data)
+	span, ctx = tracing.StartSpanFromContext(ctx, "importRoaring.ImportRoaringBits")
+	changed, rowSet, err := f.storage.ImportRoaringBits(data, clear, true, rowSize)
 	span.Finish()
 	if err != nil {
 		return err
 	}
 
-	// get a list of keys in order to update the cache
-	iter, _ := bm.Containers.Iterator(0)
-	rowSet := make(map[uint64]struct{})
-	var lastRow uint64 = math.MaxUint64
-
-	incomingCnt := uint64(0)
-	for iter.Next() {
-		key, c := iter.Value()
-		incomingCnt += uint64(c.N())
-
-		// virtual row for the current container
-		vRow := key >> shardVsContainerExponent
-
-		// skip dups
-		if vRow == lastRow {
-			continue
-		}
-		rowSet[vRow] = struct{}{}
-		lastRow = vRow
-	}
-
-	// take smallPath? TODO - ideally instead of checking f.storage.Any(), the
-	// test here would be if the storage size (in bytes) is significantly
-	// greater than the size of the incoming bits serialized as append
-	// operations. Getting the storage size might be a bit expensive though
-	// especially if the fragment isn't mapped.
-	if incomingCnt+uint64(f.opN) <= uint64(f.MaxOpN) && f.storage.Any() {
-		toSet, toClear := bm.Slice(), []uint64(nil)
-		if clear {
-			toSet, toClear = toClear, toSet
-		}
-		span, _ = tracing.StartSpanFromContext(ctx, "importRoaring.ImportPositions")
-		err := f.importPositions(toSet, toClear, rowSet)
-		span.Finish()
-		return err
-	}
-
-	if clear {
-		// We should possibly implement DifferenceInPlace...
-		span, _ = tracing.StartSpanFromContext(ctx, "importRoaringDifference")
-		bm = f.storage.Difference(bm)
-		f.storage = bm
-		span.Finish()
-	} else {
-		span, _ = tracing.StartSpanFromContext(ctx, "importRoaringStorageUIP")
-		f.storage.UnionInPlace(bm)
-		span.Finish()
-	}
-
 	if f.CacheType != CacheTypeNone {
 		for rowID := range rowSet {
-			n := bm.CountRange(rowID*ShardWidth, (rowID+1)*ShardWidth)
+			n := f.storage.CountRange(rowID*ShardWidth, (rowID+1)*ShardWidth)
 			f.cache.BulkAdd(rowID, n)
 		}
 		f.cache.Recalculate()
 	}
+	for rowID := range rowSet {
+		f.rowCache.Add(rowID, nil)
+	}
 
-	// In theory, incrementOpN should always cause a snapshot here, but we
-	// make one explicitly just in case because, in the storage/difference
-	// cases, we didn't actually write any op logs, but there may have been
-	// significant changes.
-	f.incrementOpN(int(incomingCnt))
-	f.enqueueSnapshot()
+	f.incrementOpN(changed)
 	return err
 }
 
