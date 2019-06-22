@@ -2125,7 +2125,7 @@ func BenchmarkImportRoaringUpdateConcurrent(b *testing.B) {
 						for i := 0; i < b.N; i++ {
 							for j := 0; j < concurrency; j++ {
 								frags[j] = mustOpenFragment("i", "f", viewStandard, uint64(j), cacheType)
-								err := frags[j].importRoaringT(data, false)
+								_, _, err := frags[j].storage.ImportRoaringBits(data, false, false, 0)
 								if err != nil {
 									b.Fatalf("importing roaring: %v", err)
 								}
@@ -2192,7 +2192,7 @@ func BenchmarkImportRoaringUpdate(b *testing.B) {
 					b.StopTimer()
 					for i := 0; i < b.N; i++ {
 						f := mustOpenFragment("i", fmt.Sprintf("r%dc%dcache_%s", numRows, numCols, cacheType), viewStandard, 0, cacheType)
-						err := f.importRoaringT(data, false)
+						_, _, err := f.storage.ImportRoaringBits(data, false, false, 0)
 						if err != nil {
 							b.Errorf("import error: %v", err)
 						}
