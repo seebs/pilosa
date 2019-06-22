@@ -1401,7 +1401,7 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 	}
 	err = nil
 	if log {
-		op := op{roaring: data}
+		op := op{opN: changed, roaring: data}
 		if clear {
 			op.typ = opTypeRemoveRoaring
 		} else {
@@ -4229,6 +4229,7 @@ const (
 // op represents an operation on the bitmap.
 type op struct {
 	typ     opType
+	opN     int
 	value   uint64
 	values  []uint64
 	roaring []byte
@@ -4275,7 +4276,8 @@ func (op *op) WriteTo(w io.Writer) (n int64, err error) {
 		}
 	case 4, 5:
 		binary.LittleEndian.PutUint64(buf[1:9], uint64(len(op.roaring)))
-		copy(buf[13:], op.roaring)
+		binary.LittleEndian.PutUint32(buf[13:17], uint32(op.opN))
+		copy(buf[17:], op.roaring)
 	}
 
 	// Add checksum at the end.
@@ -4320,10 +4322,11 @@ func (op *op) UnmarshalBinary(data []byte) error {
 		}
 		op.value = 0
 	case 4, 5:
-		if len(data) < int(13+op.value) {
+		if len(data) < int(13+4+op.value) {
 			return fmt.Errorf("op data truncated - expected %d, got %d", 13+op.value, len(data))
 		}
-		op.roaring = data[13 : 13+op.value]
+		op.opN = int(binary.LittleEndian.Uint32(data[13:17]))
+		op.roaring = data[17 : 17+op.value]
 		_, _ = h.Write(op.roaring)
 		op.value = 0
 	}
@@ -4343,11 +4346,10 @@ func (op *op) size() int {
 		return 1 + 8 + 4 + len(op.values)*8
 	}
 	// else it's presumably roaring?
-	return 1 + 8 + 4 + len(op.roaring)
+	return 1 + 8 + 4 + 4 + len(op.roaring)
 }
 
-// count returns the number of bits the operation mutates. it is a guess
-// for op.roaring.
+// count returns the number of bits the operation mutates.
 func (op *op) count() int {
 	switch op.typ {
 	case 0, 1:
@@ -4355,8 +4357,7 @@ func (op *op) count() int {
 	case 2, 3:
 		return len(op.values)
 	case 4, 5:
-		// completely arbitrary
-		return len(op.roaring) / 8
+		return op.opN
 	default:
 		panic(fmt.Sprintf("unknown operation type: %d", op.typ))
 	}
