@@ -490,6 +490,17 @@ func (f *fragment) Close() error {
 	return f.close()
 }
 
+// awaitSnapshot lets us delay until the snapshot gets written, preventing tests
+// from misleadingly showing amazingly fast performance because the snapshots they
+// trigger haven't happened yet.
+func (f *fragment) awaitSnapshot() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for f.snapshotting {
+		f.snapshotCond.Wait()
+	}
+}
+
 func (f *fragment) close() error {
 	// Flush cache if closing gracefully.
 	if err := f.flushCache(); err != nil {

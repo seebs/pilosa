@@ -2055,6 +2055,7 @@ func BenchmarkImportRoaring(b *testing.B) {
 					b.StartTimer()
 					err := f.importRoaringT(data, false)
 					if err != nil {
+						f.awaitSnapshot()
 						f.Clean(b)
 						b.Fatalf("import error: %v", err)
 					}
@@ -2092,7 +2093,9 @@ func BenchmarkImportRoaringConcurrent(b *testing.B) {
 						for j := 0; j < concurrency; j++ {
 							j := j
 							eg.Go(func() error {
-								return frags[j].importRoaringT(data[j], false)
+								err := frags[j].importRoaringT(data[j], false)
+								frags[j].awaitSnapshot()
+								return err
 							})
 						}
 						err := eg.Wait()
@@ -2135,7 +2138,9 @@ func BenchmarkImportRoaringUpdateConcurrent(b *testing.B) {
 							for j := 0; j < concurrency; j++ {
 								j := j
 								eg.Go(func() error {
-									return frags[j].importRoaringT(updata, false)
+									err := frags[j].importRoaringT(updata, false)
+									frags[j].awaitSnapshot()
+									return err
 								})
 							}
 							err := eg.Wait()
@@ -2198,6 +2203,7 @@ func BenchmarkImportRoaringUpdate(b *testing.B) {
 						}
 						b.StartTimer()
 						err = f.importRoaringT(updata, false)
+						f.awaitSnapshot()
 						if err != nil {
 							f.Clean(b)
 							b.Errorf("import error: %v", err)
