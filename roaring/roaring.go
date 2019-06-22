@@ -4327,11 +4327,11 @@ func (op *op) UnmarshalBinary(data []byte) error {
 		}
 		op.opN = int(binary.LittleEndian.Uint32(data[13:17]))
 		op.roaring = data[17 : 17+op.value]
-		_, _ = h.Write(op.roaring)
-		op.value = 0
+		_, _ = h.Write(data[13 : 17+op.value])
+		// op.value = 0
 	}
 	if chk := binary.LittleEndian.Uint32(data[9:13]); chk != h.Sum32() {
-		return fmt.Errorf("checksum mismatch: exp=%08x, got=%08x", h.Sum32(), chk)
+		return fmt.Errorf("checksum mismatch: type %d, exp=%08x, got=%08x", op.typ, h.Sum32(), chk)
 	}
 
 	return nil
@@ -4709,6 +4709,75 @@ func xorBitmapRun(a, b *Container) *Container {
 	}
 
 	return output
+}
+
+// CompareEquality is used mostly in test cases to confirm that two bitmaps came
+// out the same. It does not expect corresponding opN, or OpWriter, but expects
+// identical bit contents. It does not expect identical representations; a bitmap
+// container can be identical to an array container. It returns a boolean value,
+// and also an explanation for a false value.
+func (b *Bitmap) BitwiseEqual(c *Bitmap) (bool, error) {
+	biter, _ := b.Containers.Iterator(0)
+	citer, _ := c.Containers.Iterator(0)
+	bn, cn := biter.Next(), citer.Next()
+	var bk, ck uint64
+	var bc, cc *Container
+	bct, cct := 0, 0
+	for bn && cn {
+		bk, bc = biter.Value()
+		ck, cc = citer.Value()
+		// zero containers are allowed to match no-container
+		if bk < ck {
+			if bc.N() == 0 {
+				bn = biter.Next()
+				continue
+			}
+		}
+		if ck < bk {
+			if cc.N() == 0 {
+				cn = citer.Next()
+				continue
+			}
+		}
+		bct++
+		cct++
+		if bk != ck {
+			return false, fmt.Errorf("differing keys [%d vs %d]", bk, ck)
+		}
+		diff := xor(bc, cc)
+		if diff.N() != 0 {
+			return false, fmt.Errorf("differing containers for key %d: %v vs %v", bk, bc, cc)
+		}
+		bn, cn = biter.Next(), citer.Next()
+	}
+	// only one can have containers left. they should all be empty. so we
+	// look at any remaining containers, break out of the loop if they're not
+	// empty, and otherwise keep iterating.
+	for bn {
+		bn = biter.Next()
+		bk, bc = biter.Value()
+		if bc.N() != 0 {
+			bct++
+			break
+		}
+		bn = biter.Next()
+	}
+	for cn {
+		cn = citer.Next()
+		ck, cc = biter.Value()
+		if cc.N() != 0 {
+			cct++
+			break
+		}
+		cn = biter.Next()
+	}
+	if bn {
+		return false, fmt.Errorf("container mismatch: %d vs %d containers, first bitmap has extra container %d [%d bits]", bct, cct, bk, bc)
+	}
+	if cn {
+		return false, fmt.Errorf("container mismatch: %d vs %d containers, second bitmap has extra container %d [%d bits]", bct, cct, ck, cc)
+	}
+	return true, nil
 }
 
 func bitmapsEqual(b, c *Bitmap) error { // nolint: deadcode

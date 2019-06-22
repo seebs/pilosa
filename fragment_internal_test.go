@@ -2128,7 +2128,12 @@ func BenchmarkImportRoaringUpdateConcurrent(b *testing.B) {
 						for i := 0; i < b.N; i++ {
 							for j := 0; j < concurrency; j++ {
 								frags[j] = mustOpenFragment("i", "f", viewStandard, uint64(j), cacheType)
+								// the cost of actually doing the op log for the large initial data set
+								// is excessive. force storage into snapshotted state, then use import
+								// to generate an op log and/or snapshot.
 								_, _, err := frags[j].storage.ImportRoaringBits(data, false, false, 0)
+								frags[j].enqueueSnapshot()
+								frags[j].awaitSnapshot()
 								if err != nil {
 									b.Fatalf("importing roaring: %v", err)
 								}
@@ -2197,7 +2202,12 @@ func BenchmarkImportRoaringUpdate(b *testing.B) {
 					b.StopTimer()
 					for i := 0; i < b.N; i++ {
 						f := mustOpenFragment("i", fmt.Sprintf("r%dc%dcache_%s", numRows, numCols, cacheType), viewStandard, 0, cacheType)
+						// the cost of actually doing the op log for the large initial data set
+						// is excessive. force storage into snapshotted state, then use import
+						// to generate an op log and/or snapshot.
 						_, _, err := f.storage.ImportRoaringBits(data, false, false, 0)
+						f.enqueueSnapshot()
+						f.awaitSnapshot()
 						if err != nil {
 							b.Errorf("import error: %v", err)
 						}
@@ -2482,7 +2492,26 @@ func BenchmarkFileWrite(b *testing.B) {
 
 /////////////////////////////////////////////////////////////////////
 
+func (f *fragment) sanityCheck(t testing.TB) {
+	newBM := roaring.NewFileBitmap()
+	file, err := os.Open(f.path)
+	if err != nil {
+		t.Fatalf("sanityCheck couldn't open file %s: %v", f.path, err)
+	}
+	defer file.Close()
+	data, err := ioutil.ReadAll(file)
+	err = newBM.UnmarshalBinary(data)
+	if err != nil {
+		t.Fatalf("sanityCheck couldn't read fragment %s: %v", f.path, err)
+	}
+	if equal, reason := newBM.BitwiseEqual(f.storage); !equal {
+		t.Fatalf("fragment %s: unmarshalled bitmap different: %v", f.path, reason)
+	}
+}
+
 func (f *fragment) Clean(t testing.TB) {
+	f.awaitSnapshot()
+	f.sanityCheck(t)
 	errc := f.Close()
 	errf := os.Remove(f.path)
 	errp := os.Remove(f.cachePath())
@@ -3032,6 +3061,9 @@ func TestUnionInPlaceMapped(t *testing.T) {
 
 	f.storage.UnionInPlace(setBM1)
 	countUnion := f.storage.Count()
+	// UnionInPlace produces no ops log, we have to make it snapshot, to
+	// ensure that the on-disk representation is correct.
+	f.enqueueSnapshot()
 
 	if count0 != countF {
 		t.Fatalf("writing bitmap to storage changed count: %d => %d", count0, countF)
