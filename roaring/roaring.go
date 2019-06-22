@@ -4260,7 +4260,7 @@ func (op *op) apply(b *Bitmap) (changed bool) {
 
 // WriteTo writes op to the w.
 func (op *op) WriteTo(w io.Writer) (n int64, err error) {
-	buf := make([]byte, op.size())
+	buf := make([]byte, op.encodeSize())
 
 	// Write type and value.
 	buf[0] = byte(op.typ)
@@ -4277,17 +4277,28 @@ func (op *op) WriteTo(w io.Writer) (n int64, err error) {
 	case 4, 5:
 		binary.LittleEndian.PutUint64(buf[1:9], uint64(len(op.roaring)))
 		binary.LittleEndian.PutUint32(buf[13:17], uint32(op.opN))
-		copy(buf[17:], op.roaring)
 	}
 
 	// Add checksum at the end.
 	h := fnv.New32a()
 	_, _ = h.Write(buf[0:9])
 	_, _ = h.Write(buf[13:])
+	if op.typ == 4 || op.typ == 5 {
+		_, _ = h.Write(op.roaring)
+	}
 	binary.LittleEndian.PutUint32(buf[9:13], h.Sum32())
 
 	// Write to writer.
 	nn, err := w.Write(buf)
+	if err != nil {
+		return int64(nn), err
+	}
+	if op.typ == 4 || op.typ == 5 {
+		var nn2 int
+		// separate write so we don't have to copy the whole thing
+		nn2, err = w.Write(op.roaring)
+		nn += nn2
+	}
 	return int64(nn), err
 }
 
@@ -4347,6 +4358,20 @@ func (op *op) size() int {
 	}
 	// else it's presumably roaring?
 	return 1 + 8 + 4 + 4 + len(op.roaring)
+}
+
+// size returns the size needed to encode the op, in bytes. for
+// roaring ops, this does not include the roaring data, which is
+// already encoded.
+func (op *op) encodeSize() int {
+	if op.typ == opTypeAdd || op.typ == opTypeRemove {
+		return 1 + 8 + 4
+	}
+	if op.typ == opTypeAddBatch || op.typ == opTypeRemoveBatch {
+		return 1 + 8 + 4 + len(op.values)*8
+	}
+	// else it's presumably roaring?
+	return 1 + 8 + 4 + 4
 }
 
 // count returns the number of bits the operation mutates.
