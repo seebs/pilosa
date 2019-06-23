@@ -2226,15 +2226,21 @@ func (f *fragment) importRoaring(ctx context.Context, data []byte, clear bool) e
 		return err
 	}
 
-	if f.CacheType != CacheTypeNone {
-		for rowID := range rowSet {
-			n := f.storage.CountRange(rowID*ShardWidth, (rowID+1)*ShardWidth)
-			f.cache.BulkAdd(rowID, n)
+	updateCache := f.CacheType != CacheTypeNone
+	anyChanged := false
+
+	for rowID, changes := range rowSet {
+		if changes == 0 {
+			continue
 		}
-		f.cache.Recalculate()
-	}
-	for rowID := range rowSet {
+		anyChanged = true
 		f.rowCache.Add(rowID, nil)
+		if updateCache {
+			f.cache.BulkAdd(rowID, f.cache.Get(rowID)+uint64(changes))
+		}
+	}
+	if anyChanged && f.CacheType != CacheTypeNone {
+		f.cache.Recalculate()
 	}
 
 	f.incrementOpN(changed)

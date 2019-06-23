@@ -1307,7 +1307,7 @@ func (b *Bitmap) RemapRoaringStorage(data []byte) (mappedAny bool, returnErr err
 // If rowSize is non-zero, we should return a map of rows we altered,
 // where "rows" are sets of rowSize containers. Otherwise the map isn't used.
 // (This allows ImportRoaring to update caches; see fragment.go.)
-func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize uint64) (changed int, rowSet map[uint64]struct{}, err error) {
+func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize uint64) (changed int, rowSet map[uint64]int, err error) {
 	if data == nil {
 		return 0, nil, errors.New("no roaring bitmap provided")
 	}
@@ -1327,13 +1327,11 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 		return 0, nil, errors.New("failed to create roaring iterator, but don't know why")
 	}
 
-	if rowSize != 0 {
-		rowSet = make(map[uint64]struct{})
-	}
+	rowSet = make(map[uint64]int)
 
 	var synthC Container
 	var importUpdater func(*Container, bool) (*Container, bool)
-	var rowChanged bool
+	var currRow uint64
 	if clear {
 		importUpdater = func(oldC *Container, existed bool) (newC *Container, write bool) {
 			existN := oldC.N()
@@ -1342,8 +1340,9 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 			}
 			newC = difference(oldC, &synthC)
 			if newC.N() != existN {
-				rowChanged = true
-				changed += int(existN - newC.N())
+				changes := int(existN - newC.N())
+				changed += changes
+				rowSet[currRow] -= changes
 				return newC, true
 			}
 			return oldC, false
@@ -1357,7 +1356,7 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 			if existN == 0 {
 				newerC := synthC.Clone()
 				changed += int(newerC.N())
-				rowChanged = true
+				rowSet[currRow] += int(newerC.N())
 				return newerC, true
 			}
 			newC = oldC.unionInPlace(&synthC)
@@ -1365,14 +1364,14 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 				newC.Repair()
 			}
 			if newC.N() != existN {
-				changed += int(newC.N() - existN)
-				rowChanged = true
+				changes := int(newC.N() - existN)
+				changed += changes
+				rowSet[currRow] += changes
 				return newC, true
 			}
 			return oldC, false
 		}
 	}
-	prevRow := uint64(0)
 	itrKey, itrCType, itrN, itrLen, itrPointer, itrErr = itr.Next()
 	for itrErr == nil {
 		synthC.typeID = itrCType
@@ -1381,18 +1380,10 @@ func (b *Bitmap) ImportRoaringBits(data []byte, clear bool, log bool, rowSize ui
 		synthC.cap = int32(itrLen)
 		synthC.pointer = itrPointer
 		if rowSize != 0 {
-			currRow := itrKey / rowSize
-			if currRow != prevRow && rowChanged {
-				rowSet[prevRow] = struct{}{}
-				rowChanged = false
-			}
-			prevRow = currRow
+			currRow = itrKey / rowSize
 		}
 		b.Containers.Update(itrKey, importUpdater)
 		itrKey, itrCType, itrN, itrLen, itrPointer, itrErr = itr.Next()
-	}
-	if rowSize != 0 && rowChanged {
-		rowSet[prevRow] = struct{}{}
 	}
 	// note: if we get a non-EOF err, it's possible that we made SOME
 	// changes but didn't log them. I don't have a good solution to this.
