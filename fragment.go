@@ -194,7 +194,7 @@ func newSnapshotQueue(n int, w int, l logger.Logger) chan *fragment {
 
 func snapshotQueueWorker(snapshotQueue chan *fragment, l logger.Logger) {
 	for f := range snapshotQueue {
-		err := f.Snapshot()
+		err := f.protectedSnapshot(true)
 		if err != nil {
 			l.Printf("snapshot error: %v", err)
 		}
@@ -2276,24 +2276,39 @@ func (f *fragment) incrementOpN(changed int) error {
 	return nil
 }
 
-// Snapshot writes the storage bitmap to disk and reopens it.
+// Snapshot writes the storage bitmap to disk and reopens it. This may
+// overlap with existing background-queue snapshotting.
 func (f *fragment) Snapshot() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.snapshot()
 }
+
 func track(start time.Time, message string, stats stats.StatsClient, logger logger.Logger) {
 	elapsed := time.Since(start)
 	logger.Printf("%s took %s", message, elapsed)
 	stats.Histogram("snapshot", elapsed.Seconds(), 1.0)
 }
 
+// protectedSnapshot grabs the lock and unconditionally calls snapshot(). If
+// fromQueue is true, the snapshotting state is also cleared.
+func (f *fragment) protectedSnapshot(fromQueue bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	err := f.snapshot()
+	if fromQueue {
+		f.snapshotting = false
+	}
+	return err
+}
+
+// snapshot does the actual snapshot operation. it does not check or care
+// about f.snapshotting.
 func (f *fragment) snapshot() error {
 	f.totalOpN += int64(f.opN)
 	f.totalOps += int64(f.ops)
 	f.snapshotsTaken++
 	_, err := unprotectedWriteToFragment(f, f.storage)
-	f.snapshotting = false
 	return err
 }
 

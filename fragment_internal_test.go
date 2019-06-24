@@ -117,7 +117,7 @@ func TestFragment_RowcacheMap(t *testing.T) {
 		_, _ = f.setBit(0, uint64(i*32))
 	}
 	// force snapshot so we get a mmapped row...
-	_ = f.snapshot()
+	_ = f.Snapshot()
 	row := f.row(0)
 	segment := row.Segments()[0]
 	bitmap := segment.data
@@ -889,7 +889,6 @@ func BenchmarkFragment_RepeatedSmallValueImports(b *testing.B) {
 								b.Fatalf("importing values: %v", err)
 							}
 						}
-
 					}
 				})
 			}
@@ -2540,6 +2539,10 @@ func (f *fragment) CleanKeep(t testing.TB) {
 	errp := os.Remove(f.cachePath())
 	if errc != nil {
 		t.Fatal("closing fragment: ", errc, errp)
+	}
+	if f.snapshotQueue != nil {
+		close(f.snapshotQueue)
+		f.snapshotQueue = nil
 	}
 	// not all fragments have cache files
 	if errp != nil && !os.IsNotExist(errp) {
