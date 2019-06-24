@@ -157,7 +157,7 @@ func (h *Holder) Open() error {
 	// Run snapshots asynchronously. The snapshotQueue will have a background
 	// task associated with it which flushes it and waits until this channel
 	// is closed, so we should always close this channel when done.
-	h.snapshotQueue = newSnapshotQueue(100, h.Logger)
+	h.snapshotQueue = newSnapshotQueue(100, 2, h.Logger)
 
 	for _, fi := range fis {
 		// Skip files or hidden directories.

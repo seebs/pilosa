@@ -2573,7 +2573,7 @@ func mustOpenFragmentFlags(index, field, view string, shard uint64, cacheType st
 	f.RowAttrStore = &memAttrStore{
 		store: make(map[uint64]map[string]interface{}),
 	}
-	f.snapshotQueue = newSnapshotQueue(1, nil)
+	f.snapshotQueue = newSnapshotQueue(1, 1, nil)
 
 	if err := f.Open(); err != nil {
 		panic(err)

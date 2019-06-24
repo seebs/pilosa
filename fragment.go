@@ -120,6 +120,8 @@ type fragment struct {
 	snapshotsTaken     int   // number of actual snapshot operations
 	snapshotting       bool  // set to true when requesting a snapshot, set to false after snapshot completes
 	snapshotCond       sync.Cond
+	snapshotDelays     int
+	snapshotDelayTime  time.Duration
 
 	// Cache for row counts.
 	CacheType string // passed in by field
@@ -182,9 +184,11 @@ func (f *fragment) cachePath() string { return f.path + cacheExt }
 
 // newSnapshotQueue makes a new snapshot queue, of depth N, and spawns a
 // goroutine for it.
-func newSnapshotQueue(n int, l logger.Logger) chan *fragment {
+func newSnapshotQueue(n int, w int, l logger.Logger) chan *fragment {
 	ch := make(chan *fragment, n)
-	go snapshotQueueWorker(ch, l)
+	for i := 0; i < w; i++ {
+		go snapshotQueueWorker(ch, l)
+	}
 	return ch
 }
 
@@ -210,6 +214,17 @@ func (f *fragment) enqueueSnapshot() {
 	if f.snapshotQueue != nil {
 		select {
 		case f.snapshotQueue <- f:
+		default:
+			before := time.Now()
+			// wait forever, but notice that we're waiting
+			f.snapshotQueue <- f
+			f.snapshotDelays++
+			f.snapshotDelayTime += time.Now().Sub(before)
+			if f.snapshotDelays >= 10 {
+				f.Logger.Printf("snapshotting %s: last ten delays took %v", f.path, f.snapshotDelayTime)
+				f.snapshotDelays = 0
+				f.snapshotDelayTime = 0
+			}
 		case <-time.After(5 * time.Second):
 			f.Logger.Printf("snapshot for %s: timed out\n", f.path)
 		}
