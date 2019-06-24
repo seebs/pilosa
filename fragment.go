@@ -516,6 +516,14 @@ func (f *fragment) awaitSnapshot() {
 	}
 }
 
+// protectedAwaitSnapshot assumes you already hold the lock, and waits for
+// the snapshot fairy to come along.
+func (f *fragment) protectedAwaitSnapshot() {
+	for f.snapshotting {
+		f.snapshotCond.Wait()
+	}
+}
+
 func (f *fragment) close() error {
 	// Flush cache if closing gracefully.
 	if err := f.flushCache(); err != nil {
@@ -2202,6 +2210,7 @@ func (f *fragment) importValue(columnIDs []uint64, values []int64, bitDepth uint
 
 	// Process every value.
 	// If an error occurs then reopen the storage.
+	f.storage.OpWriter = nil
 	totalChanges := 0
 	if err := func() (err error) {
 		for i := range columnIDs {
@@ -2218,7 +2227,13 @@ func (f *fragment) importValue(columnIDs []uint64, values []int64, bitDepth uint
 		_ = f.openStorage(true)
 		return err
 	}
+	// We don't actually care, except we want our stats to be accurate.
 	f.incrementOpN(totalChanges)
+	// in theory, this should probably have happened anyway, but if enough
+	// of the bits matched existing bits, we'll be under our opN estimate, and
+	// we want to ensure that the snapshot happens.
+	f.enqueueSnapshot()
+	f.protectedAwaitSnapshot()
 
 	return nil
 }
