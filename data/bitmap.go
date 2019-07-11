@@ -1,5 +1,7 @@
 package data
 
+import "io"
+
 type ReadOnlyBitmap interface {
 	// Any reports whether at least one bit is set.
 	Any() bool
@@ -41,6 +43,10 @@ type ReadOnlyBitmap interface {
 	// ViewContainersRange is like ViewContainers, but covers only the containers
 	// matching the given range.
 	ViewContainersRange(first, last uint64, fn func(key uint64, c Container) (done bool, err error)) error
+	// ExportRoaring exports the bitmap's contents as roaring data using Pilosa's format.
+	ExportRoaring() []byte
+	// WriteTo dumps the bitmap's contents to the given writer as roaring data using Pilosa's format.
+	WriteRoaringTo(io.Writer)
 }
 
 // WriteOnlyBitmap is an interface which lets us describe the composition of
@@ -94,6 +100,22 @@ type Bitmap interface {
 	WriteOnlyBitmap
 }
 
+// Like WriteOnlyBitmap, OpsLogOnlyBitmap exists to be composable with the other interfaces.
+type OpsLogOnlyBitmap interface {
+	SetOpsLog(io.Writer)
+	DisableOpsLog()
+}
+
+// OpsLogBitmap represents a bitmap which supports an operations log. An operations
+// log is an io.Writer to which operations should be serialized. Operation logging
+// can be disabled for performance reasons, but this is almost always a bad idea.
+// By default, there's no concurrency guarantees on this behavior; don't run multiple
+// simultaneous writes that would need ops logging.
+type OpsLogBitmap interface {
+	Bitmap
+	OpsLogOnlyBitmap
+}
+
 // BitmapViewer is a function which operates on a read-only bitmap.
 type BitmapViewer func(b ReadOnlyBitmap) (err error)
 
@@ -129,9 +151,27 @@ type TransactionalReadOnlyBitmap interface {
 // MVCC, this might omit a lot of overhead (such as copying), and allow improved
 // performance. However, it will likely degrade performance under a lot of
 // other workloads.
+//
+// When running an ImmediateUpdate, if the write return value is false, that
+// does not guarantee that the parent bitmap wasn't modified; modifications of
+// containers could still have modified the parent's contents. Don't use
+// ImmediateUpdate if you can't ensure that this isn't a problem.
 type TransactionalBitmap interface {
 	TransactionalReadOnlyBitmap
 	WriteOnlyBitmap // lol
 	Update(first, last uint64, fn BitmapUpdater) error
 	ImmediateUpdate(first, last uint64, fn BitmapUpdater) error
+}
+
+// TransactionalOpsLogBitmap supports both transactions and operation logs.
+// How they combine:
+// If ops logging is enabled when an update occurs, the bitmap provided to
+// the update callback function will also be an OpsLogBitmap. When the
+// update process completes, if it returns with write=true, then data written to
+// the ops log for that bitmap will also be appended to the ops log for the
+// calling bitmap, otherwise, it won't. If ops logging is disabled, the
+// bitmap provided to the update callabck will not be an OpsLogBitmap.
+type TransactionalOpsLogBitmap interface {
+	TransactionalBitmap
+	OpsLogOnlyBitmap
 }
