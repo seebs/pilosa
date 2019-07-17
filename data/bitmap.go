@@ -25,12 +25,6 @@ type ReadOnlyBitmap interface {
 	// If the bitmap is a ReadOnlyBitmap, do not attempt to modify the
 	// container. The bitmap may not enforce this.
 	GetContainer(key uint64) Container
-	// Union, Difference, Intersection, and Xor create new bitmaps based
-	// on this bitmap and other provided bitmaps.
-	Union(...Bitmap) Bitmap
-	Difference(...Bitmap) Bitmap
-	Intersection(...Bitmap) Bitmap
-	Xor(...Bitmap) Bitmap
 	// OffsetRange yields a new bitmap containing values from first to last,
 	// with all positions increased by offset. All three values must be multiples
 	// of 1<<16. The resulting bitmap should be treated as read-only if the
@@ -59,14 +53,6 @@ type WriteOnlyBitmap interface {
 	Remove(uint64) bool
 	// PutContainer overwrites the container at key with a new container.
 	PutContainer(key uint64, c Container)
-	// UnionInPlace and related functions are parallel to the read-only
-	// forms, but may modify the underlying storage of the bitmap.
-	UnionInPlace(...Bitmap)
-	IntersectionInPlace(...Bitmap)
-	DifferenceInPlace(...Bitmap)
-	XorInPlace(...Bitmap)
-	// utility functions for updates
-	InvertRangeInPlace(first, last uint64)
 	// ImportRoaring, et al., handle importing bits from raw Roaring data.
 	// The Import case takes an additional parameter for whether or not the
 	// data is memory-mapped; if so, it should try to map container contents
@@ -80,6 +66,8 @@ type WriteOnlyBitmap interface {
 	IntersectionInPlaceRoaring(data []byte) error
 	DifferenceInPlaceRoaring(data []byte) error
 	XorInPlaceRoaring(data []byte) error
+	// OpInPlaceRoaring does the same thing, given an arbitrary container op.
+	OpInPlaceRoaring(data []byte, fn ContainerUpdateOp) error
 	// ProcessContainers iterates through the containers present in the bitmap calling
 	// func for each one. If func returns write == true, newC replaces the previous container
 	// for that key. Process containers returns when it runs out of containers, done is true,
@@ -92,7 +80,8 @@ type WriteOnlyBitmap interface {
 	ProcessContainersRange(first, last uint64, fn func(key uint64, c Container) (newC Container, write bool, done bool, err error)) error
 }
 
-// Bitmap represents an indexable vector of 1<<64 bits. Operations on a bitmap
+// Bitmap represents an indexable vector of 1<<64 bits, and supports write
+// operations to it as well as read operations. Operations on a bitmap
 // are not guaranteed to be concurrency-safe. If you want concurrency guarantees,
 // you might need a TransactionalBitmap.
 type Bitmap interface {

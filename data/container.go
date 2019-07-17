@@ -1,7 +1,11 @@
 package data
 
-// Container represents a 2^16 block of bit values, numbered 0..65535.
-type Container interface {
+type ContainerViewOp func(ReadOnlyContainer, ReadOnlyContainer) ReadOnlyContainer
+type ContainerUpdateOp func(Container, ReadOnlyContainer) Container
+
+// ReadOnlyContainer represents a 2^16 block of bit values, numbered 0..65535,
+// which may not be safe to write to.
+type ReadOnlyContainer interface {
 	// PreferredType is a hint as to which of the container representations will be cheapest to request.
 	PreferredType() ContainerType
 	// BitVec yields the container's contents as a bit vector in a slice of 1024 uint64.
@@ -14,36 +18,24 @@ type Container interface {
 	Any() bool
 	// Count reports the number of bits set.
 	Count() int64
+	// Clone yields a definitely-new containe which is writeable.
+	Clone() Container
+}
+
+// Container represents a writeable container -- or at least, a container which
+// provides write operations. The results of a write operation will sometimes be
+// a new container for performance/safety reasons.
+type Container interface {
+	ReadOnlyContainer
 	// Add sets the given bit, yielding a possibly-new container and a boolean indicating whether this was a change.
 	Add(uint16) (Container, bool)
 	// Remove clears the given bit, yielding a possibly-new container and a boolean indicating whether this was a change.
 	Remove(uint16) (Container, bool)
-	// Union returns a container holding the union of this container and the other.
-	Union(Container) Container
-	// Intersection returns a container holding the intersection of this container and the other.
-	Intersection(Container) Container
-	// Difference returns a container holding the difference of this container and the other. (Thus, clearing any
-	// bits set in the other.)
-	Difference(Container) Container
-	// Xor returns a container holding the exclusive or of this container and the other.
-	Xor(Container) Container
-	// UnionInPlace returns a container holding the union of this container and the other,
-	// but may overwrite this container.
-	UnionInPlace(Container) Container
-	// Intersection returns a container holding the intersection of this container and the other,
-	// but may overwrite this container.
-	IntersectionInPlace(Container) Container
-	// Difference returns a container holding the difference of this container and the other, but
-	// may overwrite this container.
-	DifferenceInPlace(Container) Container
-	// Xor returns a container holding the exclusive or of this container and the other, but
-	// may overwrite this container.
-	XorInPlace(Container) Container
-	// Inverse returns a container with all bits inverted.
-	Inverse(Container) Container
-	// InverseInPlace returns a container with all bits inverted, but may overwrite the
-	// original container.
-	InverseInPlace(Container) Container
+	// Freeze yields a read-only container identical to this one. It may
+	// actually be this one, now marked read-only -- if so, it will have
+	// been changed in such a way that future write operations will actually
+	// yield a new container.
+	Freeze() ReadOnlyContainer
 }
 
 // ContainerType is a representation format used by a container. The set of
