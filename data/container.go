@@ -1,7 +1,11 @@
 package data
 
-type ContainerViewOp func(ReadOnlyContainer, ReadOnlyContainer) ReadOnlyContainer
-type ContainerUpdateOp func(Container, ReadOnlyContainer) Container
+type ContainerViewOp func(ReadOnlyContainer) (bool, int, ReadOnlyContainer)
+type ContainerUpdateOp func(Container) (bool, int, Container)
+type ContainerViewBitOp func(ReadOnlyContainer, uint16) (bool, int, ReadOnlyContainer)
+type ContainerUpdateBitOp func(Container, uint16) (bool, int, Container)
+type ContainerViewContainerOp func(ReadOnlyContainer, ReadOnlyContainer) (bool, int, ReadOnlyContainer)
+type ContainerUpdateContainerOp func(Container, ReadOnlyContainer) (bool, int, Container)
 
 // ReadOnlyContainer represents a 2^16 block of bit values, numbered 0..65535,
 // which may not be safe to write to.
@@ -28,9 +32,9 @@ type ReadOnlyContainer interface {
 type Container interface {
 	ReadOnlyContainer
 	// Add sets the given bit, yielding a possibly-new container and a boolean indicating whether this was a change.
-	Add(uint16) (Container, bool)
+	Add(uint16) (bool, int, Container)
 	// Remove clears the given bit, yielding a possibly-new container and a boolean indicating whether this was a change.
-	Remove(uint16) (Container, bool)
+	Remove(uint16) (bool, int, Container)
 	// Freeze yields a read-only container identical to this one. It may
 	// actually be this one, now marked read-only -- if so, it will have
 	// been changed in such a way that future write operations will actually

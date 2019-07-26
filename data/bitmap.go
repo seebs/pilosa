@@ -2,6 +2,13 @@ package data
 
 import "io"
 
+type BitmapViewOp func(ReadOnlyBitmap) (bool, int64, ReadOnlyBitmap)
+type BitmapUpdateOp func(Bitmap) (bool, int64, Bitmap)
+type BitmapViewBitOp func(ReadOnlyBitmap, uint64) (bool, int64, ReadOnlyBitmap)
+type BitmapUpdateBitOp func(Bitmap, uint64) (bool, int64, Bitmap)
+type BitmapViewBitmapOp func(ReadOnlyBitmap, ReadOnlyBitmap) (bool, int64, ReadOnlyBitmap)
+type BitmapUpdateBitmapOp func(Bitmap, ReadOnlyBitmap) (bool, int64, Bitmap)
+
 type ReadOnlyBitmap interface {
 	// Any reports whether at least one bit is set.
 	Any() bool
