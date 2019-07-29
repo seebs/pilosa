@@ -2,13 +2,6 @@ package data
 
 import "io"
 
-type BitmapViewOp func(ReadOnlyBitmap) (bool, int64, ReadOnlyBitmap)
-type BitmapUpdateOp func(Bitmap) (bool, int64, Bitmap)
-type BitmapViewBitOp func(ReadOnlyBitmap, uint64) (bool, int64, ReadOnlyBitmap)
-type BitmapUpdateBitOp func(Bitmap, uint64) (bool, int64, Bitmap)
-type BitmapViewBitmapOp func(ReadOnlyBitmap, ReadOnlyBitmap) (bool, int64, ReadOnlyBitmap)
-type BitmapUpdateBitmapOp func(Bitmap, ReadOnlyBitmap) (bool, int64, Bitmap)
-
 type ReadOnlyBitmap interface {
 	// Any reports whether at least one bit is set.
 	Any() bool
@@ -74,7 +67,7 @@ type WriteOnlyBitmap interface {
 	DifferenceInPlaceRoaring(data []byte) error
 	XorInPlaceRoaring(data []byte) error
 	// OpInPlaceRoaring does the same thing, given an arbitrary container op.
-	OpInPlaceRoaring(data []byte, fn ContainerUpdateOp) error
+	OpInPlaceRoaring(data []byte, fn OpContainerUpdate) error
 	// ProcessContainers iterates through the containers present in the bitmap calling
 	// func for each one. If func returns write == true, newC replaces the previous container
 	// for that key. Process containers returns when it runs out of containers, done is true,
