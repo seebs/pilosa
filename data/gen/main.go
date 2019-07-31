@@ -18,7 +18,8 @@ type dataType struct {
 }
 
 type opData struct {
-	original   string
+	base       string
+	full       string
 	viewUpdate string
 	operand    string
 	plural     bool
@@ -38,7 +39,7 @@ func extractOpNames(ops []string) ([]opData, error) {
 			plural = true
 			details[2] = details[2][:len(details[2])-1]
 		}
-		opDatas[i] = opData{original: "OpType" + op, viewUpdate: details[1], operand: details[2], plural: plural}
+		opDatas[i] = opData{base: op, full: "OpType" + op, viewUpdate: details[1], operand: details[2], plural: plural}
 
 	}
 	return opDatas, nil
@@ -81,7 +82,7 @@ func writeData(dt dataType, opDatas []opData) error {
 		return fmt.Errorf("creating temp file '%s': %v\n", tempName, err)
 	}
 	defer file.Close()
-	err = writeOps(dt, opDatas, file)
+	err = writeTypeOps(dt, opDatas, file)
 	if err != nil {
 		retErr := fmt.Errorf("writing ops: %v", err)
 		err = os.Remove(fileName)
@@ -97,14 +98,56 @@ func writeData(dt dataType, opDatas []opData) error {
 	return nil
 }
 
-func writeOps(dt dataType, opDatas []opData, w io.Writer) error {
+func writeOpData(opDatas []opData) error {
+	fileName := "optype_gen.go"
+	tempName := fileName + ".tmp"
+	file, err := os.Create(tempName)
+	if err != nil {
+		return fmt.Errorf("creating temp file '%s': %v\n", tempName, err)
+	}
+	defer file.Close()
+	err = writeOps(opDatas, file)
+	if err != nil {
+		retErr := fmt.Errorf("writing ops: %v", err)
+		err = os.Remove(fileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "couldn't remove '%s': %v\n", tempName, err)
+		}
+		return retErr
+	}
+	err = os.Rename(tempName, fileName)
+	if err != nil {
+		return fmt.Errorf("renaming '%s' to '%s': %v", tempName, fileName, err)
+	}
+	return nil
+}
+
+func writeOps(opDatas []opData, w io.Writer) error {
 	var Printf = func(format string, args ...interface{}) (int, error) {
 		return fmt.Fprintf(w, format, args...)
 	}
 	Printf(`package data
 
 // GENERATED CODE, DO NOT EDIT
-// Generic operations types for %s
+// Generated things from the OpTypes list (see gen/main.go)
+
+var standardOpNames = [OpTypeMax]string{
+`)
+	for _, op := range opDatas {
+		Printf("\t%s: \"%s\",\n", op.full, op.base)
+	}
+	Printf("}\n")
+	return nil
+}
+
+func writeTypeOps(dt dataType, opDatas []opData, w io.Writer) error {
+	var Printf = func(format string, args ...interface{}) (int, error) {
+		return fmt.Fprintf(w, format, args...)
+	}
+	Printf(`package data
+
+// GENERATED CODE, DO NOT EDIT
+// Generic operations types for %s (see gen/main.go)
 
 // This interface exists to let us specify that something takes one of
 // these functions, but not other function types, and avoid interface{}.
@@ -114,6 +157,7 @@ type OpFunction%s interface {
 
 `, dt.name, dt.name, dt.name)
 	newline := false
+	opNames := make(map[string]string, len(opDatas))
 	for _, op := range opDatas {
 		readOnly := ""
 		aAn := "an"
@@ -136,8 +180,8 @@ type OpFunction%s interface {
 		if newline {
 			Printf("\n")
 		}
-		opName := fmt.Sprintf("Op%s%s%s", dt.name, op.viewUpdate, pluralOperand)
-		Printf("// %s is %s %s operation on a %s%s ", opName, aAn, op.viewUpdate, readOnly, dt.name)
+		opNames[op.full] = fmt.Sprintf("Op%s%s%s", dt.name, op.viewUpdate, pluralOperand)
+		Printf("// %s is %s %s operation on a %s%s ", opNames[op.full], aAn, op.viewUpdate, readOnly, dt.name)
 		switch {
 		case op.operand == "":
 			Printf("with no other parameters.\n")
@@ -147,7 +191,7 @@ type OpFunction%s interface {
 			Printf("and one%s %s.\n", other, operand)
 		}
 
-		Printf("type %s func(%s%s", opName, readOnly, dt.name)
+		Printf("type %s func(%s%s", opNames[op.full], readOnly, dt.name)
 		switch op.operand {
 		case "": // no operands
 			Printf(")")
@@ -159,9 +203,18 @@ type OpFunction%s interface {
 		// return value
 		Printf(" (bool, int%s, %s%s)\n",
 			dt.bitsOut, readOnly, dt.name)
-		Printf("func (%s) Type(%s) OpType { return %s }\n", opName, dt.name, op.original)
+		Printf("func (%s) Type(%s) OpType { return %s }\n", opNames[op.full], dt.name, op.full)
+
+		// dummy var to allow us to build a type-table.
+		Printf("var zero%s %s\n", opNames[op.full], opNames[op.full])
 		newline = true
 	}
+	Printf("// OpType to reflect.Type lookup table\n")
+	Printf("var lookup%sFunctionTypes = [OpTypeMax]OpFunction%s {\n", dt.name, dt.name)
+	for _, op := range opDatas {
+		Printf("\t%s: zero%s,\n", op.full, opNames[op.full])
+	}
+	Printf("}\n")
 	return nil
 }
 
@@ -200,5 +253,9 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "writing ops for '%s': %v\n", data.name, err)
 		}
+	}
+	err = writeOpData(opDatas)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "writing generic ops: %v\n", err)
 	}
 }

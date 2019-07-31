@@ -1,6 +1,12 @@
 package data
 
-import "io"
+import (
+	"fmt"
+	"io"
+	"reflect"
+	"strings"
+	"sync"
+)
 
 type ReadOnlyBitmap interface {
 	// Any reports whether at least one bit is set.
@@ -40,7 +46,7 @@ type ReadOnlyBitmap interface {
 	// ExportRoaring exports the bitmap's contents as roaring data using Pilosa's format.
 	ExportRoaring() []byte
 	// WriteTo dumps the bitmap's contents to the given writer as roaring data using Pilosa's format.
-	WriteRoaringTo(io.Writer)
+	WriteRoaringTo(io.Writer) error
 }
 
 // WriteOnlyBitmap is an interface which lets us describe the composition of
@@ -62,10 +68,6 @@ type WriteOnlyBitmap interface {
 	// ImportRoaring should indicate whether or not any containers are using
 	// the provided storage, so the caller can unmap if it's unused.
 	ImportRoaring(data []byte, mapped bool) (mappedAny bool, err error)
-	UnionInPlaceRoaring(data []byte) error
-	IntersectionInPlaceRoaring(data []byte) error
-	DifferenceInPlaceRoaring(data []byte) error
-	XorInPlaceRoaring(data []byte) error
 	// OpInPlaceRoaring does the same thing, given an arbitrary container op.
 	OpInPlaceRoaring(data []byte, fn OpContainerUpdate) error
 	// ProcessContainers iterates through the containers present in the bitmap calling
@@ -163,4 +165,57 @@ type TransactionalBitmap interface {
 type TransactionalOpsLogBitmap interface {
 	TransactionalBitmap
 	OpsLogOnlyBitmap
+}
+
+type bitmapOp [OpTypeMax]OpFunctionBitmap
+type bitmapOps map[string]*bitmapOp
+
+var knownBitmapOps map[reflect.Type]bitmapOps
+var knownBitmapOpsLock sync.Mutex
+
+// LookupBitmapOp finds an op for the given bitmap with the given name and type,
+// or fails. A non-nil error indicates that something went wrong; it's possible
+// for the function return to be nil, even though there is no error.
+func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (OpFunctionBitmap, error) {
+	knownBitmapOpsLock.Lock()
+	defer knownBitmapOpsLock.Unlock()
+	var err error
+	var result bitmapOps
+	var ok bool
+	if result, ok = knownBitmapOps[reflect.TypeOf(b)]; !ok {
+		err = createBitmapOpsTable(b)
+	}
+	ops := result[name]
+	if ops != nil {
+		return ops[typ], nil
+	}
+	return nil, err
+}
+
+// createBitmapOpsTable is the helper function to assemble a bitmapOps table
+// for a given bitmap implementation.
+func createBitmapOpsTable(b ReadOnlyBitmap) error {
+	typ := reflect.TypeOf(b)
+	// we want to see whether b has any methods which have names matching one of the standard forms and
+	// the right signature
+	nMethods := typ.NumMethod()
+	for i := 0; i < nMethods; i++ {
+		method := typ.Method(i)
+		// if the Func value is nil, too bad for us
+		if method.Func.IsNil() {
+			continue
+		}
+		fmt.Printf("method %d: %s\n", i, method.Name)
+		for op := OpType(0); op < OpTypeMax; op++ {
+			nameMatched := strings.HasSuffix(method.Name, standardOpNames[op])
+			typeMatched := method.Func.Type().ConvertibleTo(reflect.TypeOf(lookupBitmapFunctionTypes[op]))
+			if !(nameMatched || typeMatched) {
+				continue
+			}
+			fmt.Printf("Name: %t, Type: %t [%s vs %s]\n",
+				nameMatched, typeMatched,
+				method.Func.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String())
+		}
+	}
+	return nil
 }

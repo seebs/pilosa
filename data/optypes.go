@@ -35,4 +35,10 @@ const (
 	// Union or Intersect large sets.
 	OpTypeViewOthers
 	OpTypeUpdateOthers
+	// OpTypeMax is not a valid OpType; it's the exclusive upper bound
+	// of the set. Thus, `[OpTypeMax]foo` is an array-of-foo in which
+	// every valid OpType is a valid index.
+	OpTypeMax
+	// If you are adding an OpType below this line, you need to re-read
+	// that last comment.
 )
