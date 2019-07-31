@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -167,7 +168,8 @@ type TransactionalOpsLogBitmap interface {
 	OpsLogOnlyBitmap
 }
 
-type bitmapOp [OpTypeMax]OpFunctionBitmap
+// We're using object-methods when doing the lookup, so we're caching the method index.
+type bitmapOp [OpTypeMax]int
 type bitmapOps map[string]*bitmapOp
 
 var knownBitmapOps map[reflect.Type]bitmapOps
@@ -176,7 +178,9 @@ var knownBitmapOpsLock sync.Mutex
 // LookupBitmapOp finds an op for the given bitmap with the given name and type,
 // or fails. A non-nil error indicates that something went wrong; it's possible
 // for the function return to be nil, even though there is no error.
-func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (OpFunctionBitmap, error) {
+//
+// Temporary (hah) hackery: returning method index rather than the actual func.
+func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (int, error) {
 	knownBitmapOpsLock.Lock()
 	defer knownBitmapOpsLock.Unlock()
 	var err error
@@ -184,18 +188,26 @@ func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (OpFunctionBitmap
 	var ok bool
 	if result, ok = knownBitmapOps[reflect.TypeOf(b)]; !ok {
 		err = createBitmapOpsTable(b)
+		result = knownBitmapOps[reflect.TypeOf(b)]
 	}
 	ops := result[name]
 	if ops != nil {
 		return ops[typ], nil
 	}
-	return nil, err
+	return -1, err
 }
 
 // createBitmapOpsTable is the helper function to assemble a bitmapOps table
 // for a given bitmap implementation.
 func createBitmapOpsTable(b ReadOnlyBitmap) error {
+	val := reflect.ValueOf(b)
 	typ := reflect.TypeOf(b)
+	// even if it's empty, this will make sure that we know we tried and don't repeat for this type
+	newOps := make(map[string]*bitmapOp)
+	if knownBitmapOps == nil {
+		knownBitmapOps = make(map[reflect.Type]bitmapOps)
+	}
+	knownBitmapOps[typ] = newOps
 	// we want to see whether b has any methods which have names matching one of the standard forms and
 	// the right signature
 	nMethods := typ.NumMethod()
@@ -208,14 +220,31 @@ func createBitmapOpsTable(b ReadOnlyBitmap) error {
 		fmt.Printf("method %d: %s\n", i, method.Name)
 		for op := OpType(0); op < OpTypeMax; op++ {
 			nameMatched := strings.HasSuffix(method.Name, standardOpNames[op])
-			typeMatched := method.Func.Type().ConvertibleTo(reflect.TypeOf(lookupBitmapFunctionTypes[op]))
-			if !(nameMatched || typeMatched) {
+			if !nameMatched {
 				continue
 			}
-			fmt.Printf("Name: %t, Type: %t [%s vs %s]\n",
+			methodFunc := val.Method(i)
+			typeMatched := methodFunc.Type().ConvertibleTo(reflect.TypeOf(lookupBitmapFunctionTypes[op]))
+			opName := method.Name[:len(method.Name)-len(standardOpNames[op])]
+			if nameMatched && !typeMatched {
+				fmt.Fprintf(os.Stderr, "method '%s' looks like '%s' implementation of '%s', but type is unexpectedly '%s'\n",
+					method.Name, standardOpNames[op], opName, methodFunc.Type().String())
+				continue
+			}
+			// we probably have an implementation!
+			var opList *bitmapOp
+			var ok bool
+			if opList, ok = newOps[opName]; !ok {
+				opList = new(bitmapOp)
+				newOps[opName] = opList
+			}
+			opList[op] = i
+			fmt.Printf("Name: %t, Type: %t [%s vs %s], added to opList[%d] for ''%s'\n",
 				nameMatched, typeMatched,
-				method.Func.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String())
+				methodFunc.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String(),
+				op, opName)
 		}
 	}
+	fmt.Printf("newOps: %#v\n", newOps)
 	return nil
 }

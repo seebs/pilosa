@@ -14,4 +14,5 @@ var standardOpNames = [OpTypeMax]string{
 	OpTypeUpdateBits: "UpdateBits",
 	OpTypeViewOthers: "ViewOthers",
 	OpTypeUpdateOthers: "UpdateOthers",
+	OpTypeViewBytesUpdateBytes: "ViewBytesUpdateBytes",
 }

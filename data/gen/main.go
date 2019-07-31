@@ -147,7 +147,9 @@ func writeTypeOps(dt dataType, opDatas []opData, w io.Writer) error {
 	Printf(`package data
 
 // GENERATED CODE, DO NOT EDIT
-// Generic operations types for %s (see gen/main.go)
+// Generic operations types for %s (see gen/main.go). These are expressed
+// as method signatures -- the %s they operate on is an implicit
+// receiver not shown in the signature.
 
 // This interface exists to let us specify that something takes one of
 // these functions, but not other function types, and avoid interface{}.
@@ -191,14 +193,16 @@ type OpFunction%s interface {
 			Printf("and one%s %s.\n", other, operand)
 		}
 
-		Printf("type %s func(%s%s", opNames[op.full], readOnly, dt.name)
+		Printf("type %s func(", opNames[op.full])
 		switch op.operand {
 		case "": // no operands
 			Printf(")")
 		case "Bit":
-			Printf(", %suint%s)", dotDotDot, dt.bitsIn)
+			Printf("%suint%s)", dotDotDot, dt.bitsIn)
+		case "Byte":
+			Printf("%sbyte)", dotDotDot)
 		case "Other":
-			Printf(", %sReadOnly%s)", dotDotDot, dt.name)
+			Printf("%sReadOnly%s)", dotDotDot, dt.name)
 		}
 		// return value
 		Printf(" (bool, int%s, %s%s)\n",
@@ -209,8 +213,10 @@ type OpFunction%s interface {
 		Printf("var zero%s %s\n", opNames[op.full], opNames[op.full])
 		newline = true
 	}
-	Printf("// OpType to reflect.Type lookup table\n")
-	Printf("var lookup%sFunctionTypes = [OpTypeMax]OpFunction%s {\n", dt.name, dt.name)
+	Printf(`
+// OpType to reflect.Type lookup table
+var lookup%sFunctionTypes = [OpTypeMax]OpFunction%s {
+`, dt.name, dt.name)
 	for _, op := range opDatas {
 		Printf("\t%s: zero%s,\n", op.full, opNames[op.full])
 	}

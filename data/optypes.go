@@ -1,6 +1,6 @@
 package data
 
-//go:generate go run gen/main.go -types "Container:16:,Bitmap:64:64" View Update ViewBit UpdateBit ViewOther UpdateOther ViewBits UpdateBits ViewOthers UpdateOthers
+//go:generate go run gen/main.go -types "Container:16:,Bitmap:64:64" View Update ViewBit UpdateBit ViewOther UpdateOther ViewBits UpdateBits ViewOthers UpdateOthers ViewBytesUpdateBytes
 
 // OpType represents the kind of operation we're looking at; whether it's
 // a View (read-only) or Update (may modify) operation, and what its other
@@ -35,6 +35,12 @@ const (
 	// Union or Intersect large sets.
 	OpTypeViewOthers
 	OpTypeUpdateOthers
+	// OpTypeViewBytes and OpTypeUpdateBytes take a slice of bytes, which
+	// is written as "...byte" because that matches the spelling of the
+	// other cases, but the assumption is you'd call with `slice...`
+	// parameters. These are provided to implement things like ImportRoaring.
+	OpTypeViewBytes
+	OpTypeUpdateBytes
 	// OpTypeMax is not a valid OpType; it's the exclusive upper bound
 	// of the set. Thus, `[OpTypeMax]foo` is an array-of-foo in which
 	// every valid OpType is a valid index.
