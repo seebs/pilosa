@@ -1,5 +1,6 @@
 View
 Update
+ViewRange
 ViewBit
 UpdateBit
 ViewOther

@@ -6,6 +6,7 @@ package data
 var standardOpNames = [OpTypeMax]string{
 	OpTypeView: "View",
 	OpTypeUpdate: "Update",
+	OpTypeViewRange: "ViewRange",
 	OpTypeViewBit: "ViewBit",
 	OpTypeUpdateBit: "UpdateBit",
 	OpTypeViewOther: "ViewOther",
@@ -21,6 +22,7 @@ var standardOpNames = [OpTypeMax]string{
 const (
 	OpTypeView = OpType(iota)
 	OpTypeUpdate
+	OpTypeViewRange
 	OpTypeViewBit
 	OpTypeUpdateBit
 	OpTypeViewOther

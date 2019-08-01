@@ -19,6 +19,10 @@ type OpContainerUpdate func() (bool, int, Container)
 func (OpContainerUpdate) ContainerOpType() OpType { return OpTypeUpdate }
 var zeroOpContainerUpdate OpContainerUpdate
 
+type OpContainerViewRange func(uint16, uint16) (bool, int, ReadOnlyContainer)
+func (OpContainerViewRange) ContainerOpType() OpType { return OpTypeViewRange }
+var zeroOpContainerViewRange OpContainerViewRange
+
 type OpContainerViewBit func(uint16) (bool, int, ReadOnlyContainer)
 func (OpContainerViewBit) ContainerOpType() OpType { return OpTypeViewBit }
 var zeroOpContainerViewBit OpContainerViewBit
@@ -63,6 +67,7 @@ var zeroOpContainerViewGivesBytes OpContainerViewGivesBytes
 var lookupContainerFunctionTypes = [OpTypeMax]OpFunctionContainer {
 	OpTypeView: zeroOpContainerView,
 	OpTypeUpdate: zeroOpContainerUpdate,
+	OpTypeViewRange: zeroOpContainerViewRange,
 	OpTypeViewBit: zeroOpContainerViewBit,
 	OpTypeUpdateBit: zeroOpContainerUpdateBit,
 	OpTypeViewOther: zeroOpContainerViewContainer,

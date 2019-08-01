@@ -19,6 +19,10 @@ type OpBitmapUpdate func() (bool, int64, Bitmap)
 func (OpBitmapUpdate) BitmapOpType() OpType { return OpTypeUpdate }
 var zeroOpBitmapUpdate OpBitmapUpdate
 
+type OpBitmapViewRange func(uint64, uint64) (bool, int64, ReadOnlyBitmap)
+func (OpBitmapViewRange) BitmapOpType() OpType { return OpTypeViewRange }
+var zeroOpBitmapViewRange OpBitmapViewRange
+
 type OpBitmapViewBit func(uint64) (bool, int64, ReadOnlyBitmap)
 func (OpBitmapViewBit) BitmapOpType() OpType { return OpTypeViewBit }
 var zeroOpBitmapViewBit OpBitmapViewBit
@@ -63,6 +67,7 @@ var zeroOpBitmapViewGivesBytes OpBitmapViewGivesBytes
 var lookupBitmapFunctionTypes = [OpTypeMax]OpFunctionBitmap {
 	OpTypeView: zeroOpBitmapView,
 	OpTypeUpdate: zeroOpBitmapUpdate,
+	OpTypeViewRange: zeroOpBitmapViewRange,
 	OpTypeViewBit: zeroOpBitmapViewBit,
 	OpTypeUpdateBit: zeroOpBitmapUpdateBit,
 	OpTypeViewOther: zeroOpBitmapViewBitmap,
