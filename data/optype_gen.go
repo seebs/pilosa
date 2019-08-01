@@ -14,5 +14,23 @@ var standardOpNames = [OpTypeMax]string{
 	OpTypeUpdateBits: "UpdateBits",
 	OpTypeViewOthers: "ViewOthers",
 	OpTypeUpdateOthers: "UpdateOthers",
-	OpTypeViewBytesUpdateBytes: "ViewBytesUpdateBytes",
+	OpTypeUpdateBytes: "UpdateBytes",
+	OpTypeViewGivesBytes: "ViewGivesBytes",
 }
+
+const (
+	OpTypeView = OpType(iota)
+	OpTypeUpdate
+	OpTypeViewBit
+	OpTypeUpdateBit
+	OpTypeViewOther
+	OpTypeUpdateOther
+	OpTypeViewBits
+	OpTypeUpdateBits
+	OpTypeViewOthers
+	OpTypeUpdateOthers
+	OpTypeUpdateBytes
+	OpTypeViewGivesBytes
+
+	OpTypeMax
+)

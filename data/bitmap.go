@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -44,8 +45,6 @@ type ReadOnlyBitmap interface {
 	// ViewContainersRange is like ViewContainers, but covers only the containers
 	// matching the given range.
 	ViewContainersRange(first, last uint64, fn func(key uint64, c Container) (done bool, err error)) error
-	// ExportRoaring exports the bitmap's contents as roaring data using Pilosa's format.
-	ExportRoaring() []byte
 	// WriteTo dumps the bitmap's contents to the given writer as roaring data using Pilosa's format.
 	WriteRoaringTo(io.Writer) error
 }
@@ -197,13 +196,36 @@ func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (int, error) {
 	return -1, err
 }
 
+func (ops bitmapOps) String() string {
+	output := make([]string, len(ops)*2)
+	keys := make([]string, 0, len(ops))
+	for k := range ops {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		output = append(output, fmt.Sprintf("%s: {", key))
+		if ops[key] == nil {
+			output = append(output, " [no ops] }")
+			continue
+		}
+		for op, idx := range ops[key] {
+			if idx != -1 {
+				output = append(output, fmt.Sprintf(" %s: method #%d,", standardOpNames[op], idx))
+			}
+		}
+		output = append(output, " }, ")
+	}
+	return strings.Join(output, "")
+}
+
 // createBitmapOpsTable is the helper function to assemble a bitmapOps table
 // for a given bitmap implementation.
 func createBitmapOpsTable(b ReadOnlyBitmap) error {
 	val := reflect.ValueOf(b)
 	typ := reflect.TypeOf(b)
 	// even if it's empty, this will make sure that we know we tried and don't repeat for this type
-	newOps := make(map[string]*bitmapOp)
+	newOps := make(bitmapOps)
 	if knownBitmapOps == nil {
 		knownBitmapOps = make(map[reflect.Type]bitmapOps)
 	}
@@ -217,7 +239,6 @@ func createBitmapOpsTable(b ReadOnlyBitmap) error {
 		if method.Func.IsNil() {
 			continue
 		}
-		fmt.Printf("method %d: %s\n", i, method.Name)
 		for op := OpType(0); op < OpTypeMax; op++ {
 			nameMatched := strings.HasSuffix(method.Name, standardOpNames[op])
 			if !nameMatched {
@@ -236,15 +257,21 @@ func createBitmapOpsTable(b ReadOnlyBitmap) error {
 			var ok bool
 			if opList, ok = newOps[opName]; !ok {
 				opList = new(bitmapOp)
+				for i := range opList {
+					opList[i] = -1
+				}
 				newOps[opName] = opList
 			}
 			opList[op] = i
-			fmt.Printf("Name: %t, Type: %t [%s vs %s], added to opList[%d] for ''%s'\n",
-				nameMatched, typeMatched,
-				methodFunc.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String(),
-				op, opName)
+			if false {
+				// we may some day want this debugging message again
+				fmt.Printf("Name: %t, Type: %t [%s vs %s], added to opList[%d] for ''%s'\n",
+					nameMatched, typeMatched,
+					methodFunc.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String(),
+					op, opName)
+			}
 		}
 	}
-	fmt.Printf("newOps: %#v\n", newOps)
+	// fmt.Printf("newOps: %v\n", newOps)
 	return nil
 }
