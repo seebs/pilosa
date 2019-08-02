@@ -2,12 +2,12 @@ View
 Update
 ViewRange
 ViewBit
-UpdateBit
+UpdateBit,Bitmap:Add,Bitmap:Remove
 ViewOther
 UpdateOther
 ViewBits
 UpdateBits
 ViewOthers
 UpdateOthers
-UpdateBytes
-ViewGivesBytes
+UpdateBytes,Bitmap:ImportRoaring
+ViewGivesBytes,Bitmap:ExportRoaring

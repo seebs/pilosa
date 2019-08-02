@@ -54,6 +54,28 @@ func (iot *ioTypes) ReadOnlyTypes() string {
 	return strings.Join(iot.readOnlyTypeNames, ", ")
 }
 
+func (iot *ioTypes) Any() bool {
+	return len(iot.names) > 0
+}
+
+// NamedArgs gives "in1 type1, in2 type2, ..." for the arg list.
+func (iot *ioTypes) NamedArgs() string {
+	args := make([]string, len(iot.names))
+	for i := range iot.names {
+		args[i] = fmt.Sprintf("in%d %s", i+1, iot.readOnlyTypeNames[i])
+	}
+	return strings.Join(args, ", ")
+}
+
+// ArgNames gives the names used by NamedArgs.
+func (iot *ioTypes) ArgNames() string {
+	args := make([]string, len(iot.names))
+	for i := range iot.names {
+		args[i] = fmt.Sprintf("in%d", i+1)
+	}
+	return strings.Join(args, ", ")
+}
+
 func (iot *ioTypes) String() string {
 	if iot == nil {
 		return "[nil ioTypes]"
@@ -79,6 +101,12 @@ func (iot *ioTypes) Interpolate(dtName, dtBits string) *ioTypes {
 		case "other":
 			name = dtName
 			typeName = dtName
+		case "range":
+			// a range is done as two bits, specifying an
+			// inclusive range. it has to be inclusive because
+			// you can't represent a value greater than the
+			// maximum value...
+			typeName = fmt.Sprintf("%s, %s", dtBits, dtBits)
 		default:
 			name = iot.names[i]
 			typeName = iot.typeNames[i]
@@ -103,16 +131,22 @@ func (iot *ioTypes) Interpolate(dtName, dtBits string) *ioTypes {
 }
 
 type opData struct {
-	base       string
-	full       string
-	viewUpdate string
-	operands   *ioTypes
-	results    *ioTypes
+	base            string
+	full            string
+	viewUpdate      string
+	operands        *ioTypes
+	results         *ioTypes
+	typedDefaultOps map[string][]string
 }
 
 func (opd *opData) String() string {
-	return fmt.Sprintf("%s [%s]: %s op, inputs %s, outputs %s",
-		opd.base, opd.full, opd.viewUpdate, opd.operands, opd.results)
+	var defaults []string
+	for k, v := range opd.typedDefaultOps {
+		defaults = append(defaults, fmt.Sprintf("%s:%s", k, strings.Join(v, ",")))
+	}
+	return fmt.Sprintf("%s [%s]: %s op, inputs %s, outputs %s, defaults %s",
+		opd.base, opd.full, opd.viewUpdate, opd.operands, opd.results,
+		strings.Join(defaults, ", "))
 }
 
 var opTypeParser = regexp.MustCompile("^(View|Update)(.*?)(Gives([[:alpha:]]*))?$")
@@ -140,13 +174,26 @@ func extractTypes(typeList string) *ioTypes {
 func extractOpNames(ops []string) ([]opData, error) {
 	opDatas := make([]opData, len(ops))
 	for i, op := range ops {
+		op_and_defaults := strings.Split(op, ",")
+		op, defaults := op_and_defaults[0], op_and_defaults[1:]
 		details := opTypeParser.FindStringSubmatch(op)
 		if details == nil || details[0] == "" {
 			return nil, fmt.Errorf("name '%s' does not match expected pattern", op)
 		}
 		operands := extractTypes(details[2])
 		results := extractTypes(details[4])
-		opDatas[i] = opData{base: op, full: "OpType" + op, viewUpdate: details[1], operands: operands, results: results}
+		opd := opData{base: op, full: "OpType" + op, viewUpdate: details[1], operands: operands, results: results, typedDefaultOps: make(map[string][]string)}
+		if len(defaults) > 0 {
+			for _, def := range defaults {
+				typ_and_name := strings.Split(def, ":")
+				if len(typ_and_name) != 2 {
+					return nil, fmt.Errorf("%s should be type:name", def)
+				}
+				typ, name := typ_and_name[0], typ_and_name[1]
+				opd.typedDefaultOps[typ] = append(opd.typedDefaultOps[typ], name)
+			}
+		}
+		opDatas[i] = opd
 	}
 	return opDatas, nil
 }
@@ -225,13 +272,6 @@ func writeOps(opDatas []opData, w io.Writer) error {
 // GENERATED CODE, DO NOT EDIT
 // Generated things from the OpTypes list (see gen/main.go)
 
-var standardOpNames = [OpTypeMax]string{
-`)
-	for _, op := range opDatas {
-		Printf("\t%s: \"%s\",\n", op.full, op.base)
-	}
-	Printf(`}
-
 const (
 	%s = OpType(iota)
 `, opDatas[0].full)
@@ -257,6 +297,10 @@ func writeTypeOps(dt dataType, opDatas []opData, w io.Writer) error {
 // as method signatures -- the %s they operate on is an implicit
 // receiver not shown in the signature.
 
+import (
+	"reflect"
+)
+
 // This interface exists to let us specify that something takes one of
 // these functions, but not other function types, and avoid interface{}.
 type OpFunction%s interface {
@@ -266,41 +310,85 @@ type OpFunction%s interface {
 `, dt.name, dt.name, dt.name, dt.name)
 	newline := false
 	opNames := make(map[string]string, len(opDatas))
+	operandLists := make(map[string]string, len(opDatas))
 	for _, op := range opDatas {
 		if newline {
 			Printf("\n")
 		}
 		operands := op.operands.Interpolate(dt.name, dt.bitsIn)
+		operandLists[op.full] = operands.NamedArgs()
 		var results *ioTypes
+		// Function Suffix: e.g., "ViewBitmap" for a view function taking
+		// a Bitmap parameter
+		var opFuncSuffix string
 		if op.results != nil {
 			results = op.results.Interpolate(dt.name, dt.bitsOut)
-			opNames[op.full] = fmt.Sprintf("Op%s%s%sGives%s", dt.name, op.viewUpdate, operands.Names(), results.Names())
+			opFuncSuffix = fmt.Sprintf("%s%sGives%s", op.viewUpdate, operands.Names(), results.Names())
 		} else {
 			results = defaultResultIoTypes.Interpolate(dt.name, dt.bitsOut)
-			opNames[op.full] = fmt.Sprintf("Op%s%s%s", dt.name, op.viewUpdate, operands.Names())
+			opFuncSuffix = fmt.Sprintf("%s%s", op.viewUpdate, operands.Names())
 		}
+		// opName, such as "BitmapViewBitmap", disambiguated with receiver type.
+		opName := dt.name + opFuncSuffix
+		opNames[op.full] = opName
 		var resTypes string
 		if op.viewUpdate == "View" {
 			resTypes = results.ReadOnlyTypes()
 		} else {
 			resTypes = results.Types()
 		}
-		Printf("type %s func(%s) (%s)\n", opNames[op.full], operands.ReadOnlyTypes(), resTypes)
+		// guard the result types with () if they're plural
+		if strings.Contains(resTypes, ",") {
+			resTypes = "(" + resTypes + ")"
+		}
+		if resTypes != "" {
+			resTypes = " " + resTypes
+		}
+		literalFuncType := fmt.Sprintf("func(%s)%s", operands.ReadOnlyTypes(), resTypes)
+		Printf("type Op%s %s\n\n", opName, literalFuncType)
 
-		Printf("func (%s) %sOpType() OpType { return %s }\n", opNames[op.full], dt.name, op.full)
+		Printf("func (Op%s) %sOpType() OpType { return %s }\n", opName, dt.name, op.full)
 
-		// dummy var to allow us to build a type-table.
-		Printf("var zero%s %s\n", opNames[op.full], opNames[op.full])
+		Printf(`
+func LookupOp%s(target ReadOnly%s, name string) Op%s {
+	val := reflect.ValueOf(target)
+	method := val.MethodByName(name + "%s")
+	if method.IsValid() {
+		fn, _ := method.Interface().(%s)
+		return Op%s(fn)
+	}
+	return nil
+}
+`, opName, dt.name, opName, opFuncSuffix, literalFuncType, opName)
+
+		var readOnly string
+		if op.viewUpdate == "View" {
+			readOnly = "ReadOnly"
+		}
+		if defaults, ok := op.typedDefaultOps[dt.name]; ok {
+			var typeList, argList, argNames, argComma string
+			if operands.Any() {
+				typeList = operands.ReadOnlyTypes()
+				argList = operands.NamedArgs()
+				argNames = operands.ArgNames()
+				argComma = ", "
+			}
+			// create default op implementations
+			for _, genericOpName := range defaults {
+				Printf("\n// %s performs a default %s on a %s.\n", genericOpName, opName, dt.name)
+				Printf("type interfaceHas%s interface {\n\t%s(%s)%s\n}\n\n", genericOpName, genericOpName+opFuncSuffix, typeList, resTypes)
+				Printf("func %s(target %s%s%s%s)%s {\n", genericOpName, readOnly, dt.name, argComma, argList, resTypes)
+				Printf("	if target, ok := target.(interfaceHas%s); ok {\n", genericOpName)
+				Printf("		return target.%s(%s)\n", genericOpName+opFuncSuffix, argNames)
+				Printf("	}\n")
+				Printf("	return generic%s(target%s%s)\n", genericOpName, argComma, argNames)
+				Printf(`}
+`)
+			}
+
+		}
 		newline = true
 	}
-	Printf(`
-// OpType to reflect.Type lookup table
-var lookup%sFunctionTypes = [OpTypeMax]OpFunction%s {
-`, dt.name, dt.name)
-	for _, op := range opDatas {
-		Printf("\t%s: zero%s,\n", op.full, opNames[op.full])
-	}
-	Printf("}\n")
 	return nil
 }
 

@@ -1,13 +1,7 @@
 package data
 
 import (
-	"fmt"
 	"io"
-	"os"
-	"reflect"
-	"sort"
-	"strings"
-	"sync"
 )
 
 type ReadOnlyBitmap interface {
@@ -167,111 +161,18 @@ type TransactionalOpsLogBitmap interface {
 	OpsLogOnlyBitmap
 }
 
-// We're using object-methods when doing the lookup, so we're caching the method index.
-type bitmapOp [OpTypeMax]int
-type bitmapOps map[string]*bitmapOp
-
-var knownBitmapOps map[reflect.Type]bitmapOps
-var knownBitmapOpsLock sync.Mutex
-
-// LookupBitmapOp finds an op for the given bitmap with the given name and type,
-// or fails. A non-nil error indicates that something went wrong; it's possible
-// for the function return to be nil, even though there is no error.
-//
-// Temporary (hah) hackery: returning method index rather than the actual func.
-func LookupBitmapOp(b ReadOnlyBitmap, name string, typ OpType) (int, error) {
-	knownBitmapOpsLock.Lock()
-	defer knownBitmapOpsLock.Unlock()
-	var err error
-	var result bitmapOps
-	var ok bool
-	if result, ok = knownBitmapOps[reflect.TypeOf(b)]; !ok {
-		err = createBitmapOpsTable(b)
-		result = knownBitmapOps[reflect.TypeOf(b)]
-	}
-	ops := result[name]
-	if ops != nil {
-		return ops[typ], nil
-	}
-	return -1, err
+func genericImportRoaring(target Bitmap, data []byte) (bool, int64, Bitmap) {
+	return false, 0, nil
 }
 
-func (ops bitmapOps) String() string {
-	output := make([]string, len(ops)*2)
-	keys := make([]string, 0, len(ops))
-	for k := range ops {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		output = append(output, fmt.Sprintf("%s: {", key))
-		if ops[key] == nil {
-			output = append(output, " [no ops] }")
-			continue
-		}
-		for op, idx := range ops[key] {
-			if idx != -1 {
-				output = append(output, fmt.Sprintf(" %s: method #%d,", standardOpNames[op], idx))
-			}
-		}
-		output = append(output, " }, ")
-	}
-	return strings.Join(output, "")
-}
-
-// createBitmapOpsTable is the helper function to assemble a bitmapOps table
-// for a given bitmap implementation.
-func createBitmapOpsTable(b ReadOnlyBitmap) error {
-	val := reflect.ValueOf(b)
-	typ := reflect.TypeOf(b)
-	// even if it's empty, this will make sure that we know we tried and don't repeat for this type
-	newOps := make(bitmapOps)
-	if knownBitmapOps == nil {
-		knownBitmapOps = make(map[reflect.Type]bitmapOps)
-	}
-	knownBitmapOps[typ] = newOps
-	// we want to see whether b has any methods which have names matching one of the standard forms and
-	// the right signature
-	nMethods := typ.NumMethod()
-	for i := 0; i < nMethods; i++ {
-		method := typ.Method(i)
-		// if the Func value is nil, too bad for us
-		if method.Func.IsNil() {
-			continue
-		}
-		for op := OpType(0); op < OpTypeMax; op++ {
-			nameMatched := strings.HasSuffix(method.Name, standardOpNames[op])
-			if !nameMatched {
-				continue
-			}
-			methodFunc := val.Method(i)
-			typeMatched := methodFunc.Type().ConvertibleTo(reflect.TypeOf(lookupBitmapFunctionTypes[op]))
-			opName := method.Name[:len(method.Name)-len(standardOpNames[op])]
-			if nameMatched && !typeMatched {
-				fmt.Fprintf(os.Stderr, "method '%s' looks like '%s' implementation of '%s', but type is unexpectedly '%s'\n",
-					method.Name, standardOpNames[op], opName, methodFunc.Type().String())
-				continue
-			}
-			// we probably have an implementation!
-			var opList *bitmapOp
-			var ok bool
-			if opList, ok = newOps[opName]; !ok {
-				opList = new(bitmapOp)
-				for i := range opList {
-					opList[i] = -1
-				}
-				newOps[opName] = opList
-			}
-			opList[op] = i
-			if false {
-				// we may some day want this debugging message again
-				fmt.Printf("Name: %t, Type: %t [%s vs %s], added to opList[%d] for ''%s'\n",
-					nameMatched, typeMatched,
-					methodFunc.Type().String(), reflect.TypeOf(lookupBitmapFunctionTypes[op]).String(),
-					op, opName)
-			}
-		}
-	}
-	// fmt.Printf("newOps: %v\n", newOps)
+func genericExportRoaring(target ReadOnlyBitmap) []byte {
 	return nil
+}
+
+func genericAdd(target Bitmap, bit uint64) (bool, int64, Bitmap) {
+	return false, 0, nil
+}
+
+func genericRemove(target Bitmap, bit uint64) (bool, int64, Bitmap) {
+	return false, 0, nil
 }
