@@ -27,23 +27,8 @@ type ReadOnlyBitmap interface {
 // ReadOnly and regular Bitmaps, and then do the same composition on
 // TransactionalBitmaps.
 type WriteOnlyBitmap interface {
-	// Add sets the given bit, reporting whether or not this was a change.
-	Add(uint64) bool
-	// Remove clears the given bit, reporting whether or not this was a change.
-	Remove(uint64) bool
 	// PutContainer overwrites the container at key with a new container.
 	PutContainer(key uint64, c Container)
-	// ImportRoaring, et al., handle importing bits from raw Roaring data.
-	// The Import case takes an additional parameter for whether or not the
-	// data is memory-mapped; if so, it should try to map container contents
-	// to that data if possible/applicable. Otherwise, and in the other cases,
-	// you should *not* use the provided data.
-	//
-	// ImportRoaring should indicate whether or not any containers are using
-	// the provided storage, so the caller can unmap if it's unused.
-	ImportRoaring(data []byte, mapped bool) (mappedAny bool, err error)
-	// OpInPlaceRoaring does the same thing, given an arbitrary container op.
-	OpInPlaceRoaring(data []byte, fn OpContainerUpdate) error
 	// ProcessContainers iterates through the containers present in the bitmap calling
 	// func for each one. If func returns write == true, newC replaces the previous container
 	// for that key. Process containers returns when it runs out of containers, done is true,
