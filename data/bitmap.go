@@ -12,15 +12,11 @@ type ReadOnlyBitmap interface {
 	// If the bitmap is a ReadOnlyBitmap, do not attempt to modify the
 	// container. The bitmap may not enforce this.
 	GetContainer(key uint64) Container
-	// ViewContainers calls the provided function on a series of containers,
-	// stopping when done is true or err is non-nil, and returning err if it
-	// was non-nil.
-	ViewContainers(fn func(key uint64, c Container) (done bool, err error)) error
 	// ViewContainersRange is like ViewContainers, but covers only the containers
-	// matching the given range.
+	// matching the given range. It starts with the first container with a
+	// key not less than first, and stops with the last container with
+	// a key not greater than last.
 	ViewContainersRange(first, last uint64, fn func(key uint64, c Container) (done bool, err error)) error
-	// WriteTo dumps the bitmap's contents to the given writer as roaring data using Pilosa's format.
-	WriteRoaringTo(io.Writer) error
 }
 
 // WriteOnlyBitmap is an interface which lets us describe the composition of
@@ -29,15 +25,10 @@ type ReadOnlyBitmap interface {
 type WriteOnlyBitmap interface {
 	// PutContainer overwrites the container at key with a new container.
 	PutContainer(key uint64, c Container)
-	// ProcessContainers iterates through the containers present in the bitmap calling
+	// ProcessContainersRange iterates through the containers present in the bitmap calling
 	// func for each one. If func returns write == true, newC replaces the previous container
 	// for that key. Process containers returns when it runs out of containers, done is true,
 	// or err is non-nil, returning a non-nil err if one was given.
-	ProcessContainers(fn func(key uint64, c Container) (newC Container, write bool, done bool, err error)) error
-	// ProcessContainersRange does the same thing, but only for containers which contain bits in the provided
-	// range. For instance, if called with first 0, last 1<<16, it will process containers at keys 0 and 1.
-	// It doesn't care whether the bits in the range are set, just whether the containers would contain them
-	// if they were.
 	ProcessContainersRange(first, last uint64, fn func(key uint64, c Container) (newC Container, write bool, done bool, err error)) error
 }
 
