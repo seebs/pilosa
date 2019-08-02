@@ -6,6 +6,7 @@ package data
 // receiver not shown in the signature.
 
 import (
+	"io"
 	"reflect"
 )
 
@@ -15,7 +16,7 @@ type OpFunctionContainer interface {
 	ContainerOpType() OpType
 }
 
-type OpContainerView func() (bool, int, Container)
+type OpContainerView func() (bool, int, ReadOnlyContainer)
 
 func (OpContainerView) ContainerOpType() OpType { return OpTypeView }
 
@@ -23,7 +24,7 @@ func LookupOpContainerView(target ReadOnlyContainer, name string) OpContainerVie
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "View")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func() (bool, int, Container))
+		fn, _ := method.Interface().(func() (bool, int, ReadOnlyContainer))
 		return OpContainerView(fn)
 	}
 	return nil
@@ -85,7 +86,7 @@ func LookupOpContainerViewRangeGivesBit(target ReadOnlyContainer, name string) O
 	return nil
 }
 
-type OpContainerViewRangeGivesContainer func(uint16, uint16) Container
+type OpContainerViewRangeGivesContainer func(uint16, uint16) ReadOnlyContainer
 
 func (OpContainerViewRangeGivesContainer) ContainerOpType() OpType { return OpTypeViewRangeGivesOther }
 
@@ -93,7 +94,7 @@ func LookupOpContainerViewRangeGivesContainer(target ReadOnlyContainer, name str
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesContainer")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint16, uint16) Container)
+		fn, _ := method.Interface().(func(uint16, uint16) ReadOnlyContainer)
 		return OpContainerViewRangeGivesContainer(fn)
 	}
 	return nil
@@ -127,7 +128,7 @@ func LookupOpContainerUpdate(target ReadOnlyContainer, name string) OpContainerU
 	return nil
 }
 
-type OpContainerViewRange func(uint16, uint16) (bool, int, Container)
+type OpContainerViewRange func(uint16, uint16) (bool, int, ReadOnlyContainer)
 
 func (OpContainerViewRange) ContainerOpType() OpType { return OpTypeViewRange }
 
@@ -135,13 +136,13 @@ func LookupOpContainerViewRange(target ReadOnlyContainer, name string) OpContain
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRange")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint16, uint16) (bool, int, Container))
+		fn, _ := method.Interface().(func(uint16, uint16) (bool, int, ReadOnlyContainer))
 		return OpContainerViewRange(fn)
 	}
 	return nil
 }
 
-type OpContainerViewBit func(uint16) (bool, int, Container)
+type OpContainerViewBit func(uint16) (bool, int, ReadOnlyContainer)
 
 func (OpContainerViewBit) ContainerOpType() OpType { return OpTypeViewBit }
 
@@ -149,7 +150,7 @@ func LookupOpContainerViewBit(target ReadOnlyContainer, name string) OpContainer
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBit")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint16) (bool, int, Container))
+		fn, _ := method.Interface().(func(uint16) (bool, int, ReadOnlyContainer))
 		return OpContainerViewBit(fn)
 	}
 	return nil
@@ -169,7 +170,7 @@ func LookupOpContainerUpdateBit(target ReadOnlyContainer, name string) OpContain
 	return nil
 }
 
-type OpContainerViewContainer func(Container) (bool, int, Container)
+type OpContainerViewContainer func(ReadOnlyContainer) (bool, int, ReadOnlyContainer)
 
 func (OpContainerViewContainer) ContainerOpType() OpType { return OpTypeViewOther }
 
@@ -177,13 +178,13 @@ func LookupOpContainerViewContainer(target ReadOnlyContainer, name string) OpCon
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainer")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(Container) (bool, int, Container))
+		fn, _ := method.Interface().(func(ReadOnlyContainer) (bool, int, ReadOnlyContainer))
 		return OpContainerViewContainer(fn)
 	}
 	return nil
 }
 
-type OpContainerUpdateContainer func(Container) (bool, int, Container)
+type OpContainerUpdateContainer func(ReadOnlyContainer) (bool, int, Container)
 
 func (OpContainerUpdateContainer) ContainerOpType() OpType { return OpTypeUpdateOther }
 
@@ -191,13 +192,13 @@ func LookupOpContainerUpdateContainer(target ReadOnlyContainer, name string) OpC
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainer")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(Container) (bool, int, Container))
+		fn, _ := method.Interface().(func(ReadOnlyContainer) (bool, int, Container))
 		return OpContainerUpdateContainer(fn)
 	}
 	return nil
 }
 
-type OpContainerViewBits func([]uint16) (bool, int, Container)
+type OpContainerViewBits func([]uint16) (bool, int, ReadOnlyContainer)
 
 func (OpContainerViewBits) ContainerOpType() OpType { return OpTypeViewBits }
 
@@ -205,7 +206,7 @@ func LookupOpContainerViewBits(target ReadOnlyContainer, name string) OpContaine
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBits")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]uint16) (bool, int, Container))
+		fn, _ := method.Interface().(func([]uint16) (bool, int, ReadOnlyContainer))
 		return OpContainerViewBits(fn)
 	}
 	return nil
@@ -225,7 +226,7 @@ func LookupOpContainerUpdateBits(target ReadOnlyContainer, name string) OpContai
 	return nil
 }
 
-type OpContainerViewContainers func([]Container) (bool, int, Container)
+type OpContainerViewContainers func([]ReadOnlyContainer) (bool, int, ReadOnlyContainer)
 
 func (OpContainerViewContainers) ContainerOpType() OpType { return OpTypeViewOthers }
 
@@ -233,13 +234,13 @@ func LookupOpContainerViewContainers(target ReadOnlyContainer, name string) OpCo
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainers")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]Container) (bool, int, Container))
+		fn, _ := method.Interface().(func([]ReadOnlyContainer) (bool, int, ReadOnlyContainer))
 		return OpContainerViewContainers(fn)
 	}
 	return nil
 }
 
-type OpContainerUpdateContainers func([]Container) (bool, int, Container)
+type OpContainerUpdateContainers func([]ReadOnlyContainer) (bool, int, Container)
 
 func (OpContainerUpdateContainers) ContainerOpType() OpType { return OpTypeUpdateOthers }
 
@@ -247,7 +248,7 @@ func LookupOpContainerUpdateContainers(target ReadOnlyContainer, name string) Op
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainers")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]Container) (bool, int, Container))
+		fn, _ := method.Interface().(func([]ReadOnlyContainer) (bool, int, Container))
 		return OpContainerUpdateContainers(fn)
 	}
 	return nil
@@ -267,16 +268,16 @@ func LookupOpContainerUpdateBytes(target ReadOnlyContainer, name string) OpConta
 	return nil
 }
 
-type OpContainerViewGivesBytes func() []byte
+type OpContainerViewWriterGivesError func(io.Writer) error
 
-func (OpContainerViewGivesBytes) ContainerOpType() OpType { return OpTypeViewGivesBytes }
+func (OpContainerViewWriterGivesError) ContainerOpType() OpType { return OpTypeViewWriterGivesError }
 
-func LookupOpContainerViewGivesBytes(target ReadOnlyContainer, name string) OpContainerViewGivesBytes {
+func LookupOpContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
 	val := reflect.ValueOf(target)
-	method := val.MethodByName(name + "ViewGivesBytes")
+	method := val.MethodByName(name + "ViewWriterGivesError")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func() []byte)
-		return OpContainerViewGivesBytes(fn)
+		fn, _ := method.Interface().(func(io.Writer) error)
+		return OpContainerViewWriterGivesError(fn)
 	}
 	return nil
 }

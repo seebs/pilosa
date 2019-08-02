@@ -109,13 +109,13 @@ func (iot *ioTypes) Interpolate(dtName, dtBits string) *ioTypes {
 			// you can't represent a value greater than the
 			// maximum value...
 			typeNames = []string{dtBits, dtBits}
-		default:
-			name = iot.names[i]
+		case "Writer":
+			typeNames[0] = "io.Writer"
 		}
 		roName := name
 		roTypeNames := make([]string, len(typeNames))
 		copy(roTypeNames, typeNames)
-		if typ == "other" {
+		if typ == "Other" {
 			roName = "ReadOnly" + name
 			for j, typeName := range typeNames {
 				roTypeNames[j] = "ReadOnly" + typeName
@@ -307,6 +307,7 @@ func writeTypeOps(dt dataType, opDatas []opData, w io.Writer) error {
 // receiver not shown in the signature.
 
 import (
+	"io"
 	"reflect"
 )
 

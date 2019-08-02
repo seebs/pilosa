@@ -130,7 +130,7 @@ func genericImportRoaring(target Bitmap, data []byte) (bool, uint64, Bitmap) {
 	return false, 0, nil
 }
 
-func genericExportRoaring(target ReadOnlyBitmap) []byte {
+func genericExportRoaring(target ReadOnlyBitmap, w io.Writer) error {
 	return nil
 }
 

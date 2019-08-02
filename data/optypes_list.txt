@@ -16,4 +16,4 @@ UpdateBits
 ViewOthers
 UpdateOthers
 UpdateBytes,Bitmap:ImportRoaring
-ViewGivesBytes,Bitmap:ExportRoaring
+ViewWriterGivesError,Bitmap:ExportRoaring

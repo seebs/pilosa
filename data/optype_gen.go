@@ -22,7 +22,7 @@ const (
 	OpTypeViewOthers
 	OpTypeUpdateOthers
 	OpTypeUpdateBytes
-	OpTypeViewGivesBytes
+	OpTypeViewWriterGivesError
 
 	OpTypeMax
 )

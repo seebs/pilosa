@@ -6,6 +6,7 @@ package data
 // receiver not shown in the signature.
 
 import (
+	"io"
 	"reflect"
 )
 
@@ -15,7 +16,7 @@ type OpFunctionBitmap interface {
 	BitmapOpType() OpType
 }
 
-type OpBitmapView func() (bool, uint64, Bitmap)
+type OpBitmapView func() (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapView) BitmapOpType() OpType { return OpTypeView }
 
@@ -23,7 +24,7 @@ func LookupOpBitmapView(target ReadOnlyBitmap, name string) OpBitmapView {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "View")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func() (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func() (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapView(fn)
 	}
 	return nil
@@ -133,7 +134,7 @@ func CountRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) uint64 {
 	return genericCountRange(target, in1, in2)
 }
 
-type OpBitmapViewRangeGivesBitmap func(uint64, uint64) Bitmap
+type OpBitmapViewRangeGivesBitmap func(uint64, uint64) ReadOnlyBitmap
 
 func (OpBitmapViewRangeGivesBitmap) BitmapOpType() OpType { return OpTypeViewRangeGivesOther }
 
@@ -141,7 +142,7 @@ func LookupOpBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBi
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBitmap")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint64, uint64) Bitmap)
+		fn, _ := method.Interface().(func(uint64, uint64) ReadOnlyBitmap)
 		return OpBitmapViewRangeGivesBitmap(fn)
 	}
 	return nil
@@ -149,10 +150,10 @@ func LookupOpBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBi
 
 // OffsetRange performs a default BitmapViewRangeGivesBitmap on a Bitmap.
 type interfaceHasOffsetRange interface {
-	OffsetRangeViewRangeGivesBitmap(uint64, uint64) Bitmap
+	OffsetRangeViewRangeGivesBitmap(uint64, uint64) ReadOnlyBitmap
 }
 
-func OffsetRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) Bitmap {
+func OffsetRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) ReadOnlyBitmap {
 	if target, ok := target.(interfaceHasOffsetRange); ok {
 		return target.OffsetRangeViewRangeGivesBitmap(in1, in2)
 	}
@@ -199,7 +200,7 @@ func LookupOpBitmapUpdate(target ReadOnlyBitmap, name string) OpBitmapUpdate {
 	return nil
 }
 
-type OpBitmapViewRange func(uint64, uint64) (bool, uint64, Bitmap)
+type OpBitmapViewRange func(uint64, uint64) (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapViewRange) BitmapOpType() OpType { return OpTypeViewRange }
 
@@ -207,13 +208,13 @@ func LookupOpBitmapViewRange(target ReadOnlyBitmap, name string) OpBitmapViewRan
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRange")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint64, uint64) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func(uint64, uint64) (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapViewRange(fn)
 	}
 	return nil
 }
 
-type OpBitmapViewBit func(uint64) (bool, uint64, Bitmap)
+type OpBitmapViewBit func(uint64) (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapViewBit) BitmapOpType() OpType { return OpTypeViewBit }
 
@@ -221,7 +222,7 @@ func LookupOpBitmapViewBit(target ReadOnlyBitmap, name string) OpBitmapViewBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBit")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(uint64) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func(uint64) (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapViewBit(fn)
 	}
 	return nil
@@ -265,7 +266,7 @@ func Remove(target Bitmap, in1 uint64) (bool, uint64, Bitmap) {
 	return genericRemove(target, in1)
 }
 
-type OpBitmapViewBitmap func(Bitmap) (bool, uint64, Bitmap)
+type OpBitmapViewBitmap func(ReadOnlyBitmap) (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapViewBitmap) BitmapOpType() OpType { return OpTypeViewOther }
 
@@ -273,13 +274,13 @@ func LookupOpBitmapViewBitmap(target ReadOnlyBitmap, name string) OpBitmapViewBi
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBitmap")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(Bitmap) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func(ReadOnlyBitmap) (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapViewBitmap(fn)
 	}
 	return nil
 }
 
-type OpBitmapUpdateBitmap func(Bitmap) (bool, uint64, Bitmap)
+type OpBitmapUpdateBitmap func(ReadOnlyBitmap) (bool, uint64, Bitmap)
 
 func (OpBitmapUpdateBitmap) BitmapOpType() OpType { return OpTypeUpdateOther }
 
@@ -287,13 +288,13 @@ func LookupOpBitmapUpdateBitmap(target ReadOnlyBitmap, name string) OpBitmapUpda
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBitmap")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func(Bitmap) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func(ReadOnlyBitmap) (bool, uint64, Bitmap))
 		return OpBitmapUpdateBitmap(fn)
 	}
 	return nil
 }
 
-type OpBitmapViewBits func([]uint64) (bool, uint64, Bitmap)
+type OpBitmapViewBits func([]uint64) (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapViewBits) BitmapOpType() OpType { return OpTypeViewBits }
 
@@ -301,7 +302,7 @@ func LookupOpBitmapViewBits(target ReadOnlyBitmap, name string) OpBitmapViewBits
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBits")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]uint64) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func([]uint64) (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapViewBits(fn)
 	}
 	return nil
@@ -321,7 +322,7 @@ func LookupOpBitmapUpdateBits(target ReadOnlyBitmap, name string) OpBitmapUpdate
 	return nil
 }
 
-type OpBitmapViewBitmaps func([]Bitmap) (bool, uint64, Bitmap)
+type OpBitmapViewBitmaps func([]ReadOnlyBitmap) (bool, uint64, ReadOnlyBitmap)
 
 func (OpBitmapViewBitmaps) BitmapOpType() OpType { return OpTypeViewOthers }
 
@@ -329,13 +330,13 @@ func LookupOpBitmapViewBitmaps(target ReadOnlyBitmap, name string) OpBitmapViewB
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBitmaps")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]Bitmap) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func([]ReadOnlyBitmap) (bool, uint64, ReadOnlyBitmap))
 		return OpBitmapViewBitmaps(fn)
 	}
 	return nil
 }
 
-type OpBitmapUpdateBitmaps func([]Bitmap) (bool, uint64, Bitmap)
+type OpBitmapUpdateBitmaps func([]ReadOnlyBitmap) (bool, uint64, Bitmap)
 
 func (OpBitmapUpdateBitmaps) BitmapOpType() OpType { return OpTypeUpdateOthers }
 
@@ -343,7 +344,7 @@ func LookupOpBitmapUpdateBitmaps(target ReadOnlyBitmap, name string) OpBitmapUpd
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBitmaps")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func([]Bitmap) (bool, uint64, Bitmap))
+		fn, _ := method.Interface().(func([]ReadOnlyBitmap) (bool, uint64, Bitmap))
 		return OpBitmapUpdateBitmaps(fn)
 	}
 	return nil
@@ -375,28 +376,28 @@ func ImportRoaring(target Bitmap, in1 []byte) (bool, uint64, Bitmap) {
 	return genericImportRoaring(target, in1)
 }
 
-type OpBitmapViewGivesBytes func() []byte
+type OpBitmapViewWriterGivesError func(io.Writer) error
 
-func (OpBitmapViewGivesBytes) BitmapOpType() OpType { return OpTypeViewGivesBytes }
+func (OpBitmapViewWriterGivesError) BitmapOpType() OpType { return OpTypeViewWriterGivesError }
 
-func LookupOpBitmapViewGivesBytes(target ReadOnlyBitmap, name string) OpBitmapViewGivesBytes {
+func LookupOpBitmapViewWriterGivesError(target ReadOnlyBitmap, name string) OpBitmapViewWriterGivesError {
 	val := reflect.ValueOf(target)
-	method := val.MethodByName(name + "ViewGivesBytes")
+	method := val.MethodByName(name + "ViewWriterGivesError")
 	if method.IsValid() {
-		fn, _ := method.Interface().(func() []byte)
-		return OpBitmapViewGivesBytes(fn)
+		fn, _ := method.Interface().(func(io.Writer) error)
+		return OpBitmapViewWriterGivesError(fn)
 	}
 	return nil
 }
 
-// ExportRoaring performs a default BitmapViewGivesBytes on a Bitmap.
+// ExportRoaring performs a default BitmapViewWriterGivesError on a Bitmap.
 type interfaceHasExportRoaring interface {
-	ExportRoaringViewGivesBytes() []byte
+	ExportRoaringViewWriterGivesError(io.Writer) error
 }
 
-func ExportRoaring(target ReadOnlyBitmap) []byte {
+func ExportRoaring(target ReadOnlyBitmap, in1 io.Writer) error {
 	if target, ok := target.(interfaceHasExportRoaring); ok {
-		return target.ExportRoaringViewGivesBytes()
+		return target.ExportRoaringViewWriterGivesError(in1)
 	}
-	return genericExportRoaring(target)
+	return genericExportRoaring(target, in1)
 }
