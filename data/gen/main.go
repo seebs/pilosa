@@ -30,7 +30,7 @@ type ioTypes struct {
 }
 
 var defaultResultIoTypes = &ioTypes{
-	names:     []string{"", "", ""},
+	names:     []string{"Bool", "Bit", "Other"},
 	typeNames: []string{"bool", "bit", "other"},
 }
 
@@ -60,8 +60,8 @@ func (iot *ioTypes) Any() bool {
 
 // NamedArgs gives "in1 type1, in2 type2, ..." for the arg list.
 func (iot *ioTypes) NamedArgs() string {
-	args := make([]string, len(iot.names))
-	for i := range iot.names {
+	args := make([]string, len(iot.typeNames))
+	for i := range iot.typeNames {
 		args[i] = fmt.Sprintf("in%d %s", i+1, iot.readOnlyTypeNames[i])
 	}
 	return strings.Join(args, ", ")
@@ -69,8 +69,8 @@ func (iot *ioTypes) NamedArgs() string {
 
 // ArgNames gives the names used by NamedArgs.
 func (iot *ioTypes) ArgNames() string {
-	args := make([]string, len(iot.names))
-	for i := range iot.names {
+	args := make([]string, len(iot.typeNames))
+	for i := range iot.typeNames {
 		args[i] = fmt.Sprintf("in%d", i+1)
 	}
 	return strings.Join(args, ", ")
@@ -92,40 +92,49 @@ func (iot *ioTypes) Interpolate(dtName, dtBits string) *ioTypes {
 	}
 	newIot := newIoTypes(len(iot.names))
 	copy(newIot.plurals, iot.plurals)
-	for i, typ := range iot.typeNames {
+	newIot.typeNames = newIot.typeNames[:0]
+	newIot.readOnlyTypeNames = newIot.readOnlyTypeNames[:0]
+	for i, typ := range iot.names {
 		name := iot.names[i]
-		typeName := iot.typeNames[i]
+		typeNames := []string{iot.typeNames[i]}
 		switch typ {
-		case "bit":
-			typeName = dtBits
-		case "other":
+		case "Bit":
+			typeNames[0] = dtBits
+		case "Other":
 			name = dtName
-			typeName = dtName
-		case "range":
+			typeNames[0] = dtName
+		case "Range":
 			// a range is done as two bits, specifying an
 			// inclusive range. it has to be inclusive because
 			// you can't represent a value greater than the
 			// maximum value...
-			typeName = fmt.Sprintf("%s, %s", dtBits, dtBits)
+			typeNames = []string{dtBits, dtBits}
 		default:
 			name = iot.names[i]
-			typeName = iot.typeNames[i]
 		}
 		roName := name
-		roTypeName := typeName
+		roTypeNames := make([]string, len(typeNames))
+		copy(roTypeNames, typeNames)
 		if typ == "other" {
 			roName = "ReadOnly" + name
-			roTypeName = "ReadOnly" + typeName
+			for j, typeName := range typeNames {
+				roTypeNames[j] = "ReadOnly" + typeName
+			}
 		}
 		if newIot.plurals[i] {
 			name += "s"
-			typeName = "[]" + typeName
-			roTypeName = "[]" + roTypeName
+			for j, typeName := range typeNames {
+				typeNames[j] = "[]" + typeName
+				roTypeNames[j] = "[]" + roTypeNames[j]
+			}
 		}
 		newIot.names[i] = name
-		newIot.typeNames[i] = typeName
+		newIot.typeNames = append(newIot.typeNames, typeNames...)
 		newIot.readOnlyNames[i] = roName
-		newIot.readOnlyTypeNames[i] = roTypeName
+		newIot.readOnlyTypeNames = append(newIot.readOnlyTypeNames, roTypeNames...)
+		if typ == "range" {
+			fmt.Printf("new typeNames: %s\n", newIot.typeNames)
+		}
 	}
 	return newIot
 }
@@ -399,7 +408,7 @@ var nonAlpha = regexp.MustCompile("[^[:alnum:]]")
 // We could also parse the ops from optypes.go, but this seems like a lot
 // of work.
 func main() {
-	typeNames := flag.String("types", "Container:uint16:int,Bitmap:uint64:int64", "types, specified as comma-separated typename:bitIn:bitOut, such as Container:uint16:,Bitmap:uint64:int64")
+	typeNames := flag.String("types", "Container:uint16:int,Bitmap:uint64:uint64", "types, specified as comma-separated typename:bitIn:bitOut, such as Container:uint16:,Bitmap:uint64:uint64")
 	typeSource := flag.String("typelist", "optypes_list.txt", "file containing a list of optypes (specify \"\" to ignore)")
 	flag.Parse()
 	types := strings.Split(*typeNames, ",")

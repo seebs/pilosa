@@ -1,4 +1,10 @@
 View
+ViewGivesBool,Bitmap:Any
+ViewGivesBit,Bitmap:Count
+ViewRangeGivesBool,Bitmap:AnyRange
+ViewRangeGivesBit,Bitmap:CountRange
+ViewRangeGivesOther,Bitmap:OffsetRange
+ViewRangeGivesBitsBool,Bitmap:SliceRange
 Update
 ViewRange
 ViewBit

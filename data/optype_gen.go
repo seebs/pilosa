@@ -5,6 +5,12 @@ package data
 
 const (
 	OpTypeView = OpType(iota)
+	OpTypeViewGivesBool
+	OpTypeViewGivesBit
+	OpTypeViewRangeGivesBool
+	OpTypeViewRangeGivesBit
+	OpTypeViewRangeGivesOther
+	OpTypeViewRangeGivesBitsBool
 	OpTypeUpdate
 	OpTypeViewRange
 	OpTypeViewBit

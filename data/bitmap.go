@@ -5,21 +5,6 @@ import (
 )
 
 type ReadOnlyBitmap interface {
-	// Any reports whether at least one bit is set.
-	Any() bool
-	// AnyRange reports whether at least one bit is set between first and last, inclusive.
-	AnyRange(first, last uint64) bool
-	// Count reports the number of bits set.
-	Count() uint64
-	// CountRange reports the number of bits set between first and last, inclusive.
-	CountRange(first, last uint64) uint64
-	// Slice() yields the bits as a slice of uint64, up to some limit;
-	// past that, it will report overflow. The limit is up to the
-	// implementation, but should be at least 2<<16. (This arbitrary
-	// value exists to make test case writing easier.)
-	Slice() (values []uint64, overflow bool)
-	// SliceRange is like Slice(), but within a limited range.
-	SliceRange(first, last uint64) (values []uint64, overflow bool)
 	// GetContainer yields a Container holding the 1<<16 values starting at
 	// key * (1<<16). For instance, if key is 1, it returns the bits from
 	// 65,536 to 131,071 inclusive.
@@ -27,11 +12,6 @@ type ReadOnlyBitmap interface {
 	// If the bitmap is a ReadOnlyBitmap, do not attempt to modify the
 	// container. The bitmap may not enforce this.
 	GetContainer(key uint64) Container
-	// OffsetRange yields a new bitmap containing values from first to last,
-	// with all positions increased by offset. All three values must be multiples
-	// of 1<<16. The resulting bitmap should be treated as read-only if the
-	// bitmap it is derived from was read-only.
-	OffsetRange(offset, first, last uint64) Bitmap
 	// ViewContainers calls the provided function on a series of containers,
 	// stopping when done is true or err is non-nil, and returning err if it
 	// was non-nil.
@@ -161,7 +141,7 @@ type TransactionalOpsLogBitmap interface {
 	OpsLogOnlyBitmap
 }
 
-func genericImportRoaring(target Bitmap, data []byte) (bool, int64, Bitmap) {
+func genericImportRoaring(target Bitmap, data []byte) (bool, uint64, Bitmap) {
 	return false, 0, nil
 }
 
@@ -169,10 +149,34 @@ func genericExportRoaring(target ReadOnlyBitmap) []byte {
 	return nil
 }
 
-func genericAdd(target Bitmap, bit uint64) (bool, int64, Bitmap) {
+func genericAdd(target Bitmap, bit uint64) (bool, uint64, Bitmap) {
 	return false, 0, nil
 }
 
-func genericRemove(target Bitmap, bit uint64) (bool, int64, Bitmap) {
+func genericRemove(target Bitmap, bit uint64) (bool, uint64, Bitmap) {
 	return false, 0, nil
+}
+
+func genericAny(target ReadOnlyBitmap) bool {
+	return false
+}
+
+func genericCount(target ReadOnlyBitmap) uint64 {
+	return 0
+}
+
+func genericAnyRange(target ReadOnlyBitmap, first, last uint64) bool {
+	return false
+}
+
+func genericCountRange(target ReadOnlyBitmap, first, last uint64) uint64 {
+	return 0
+}
+
+func genericSliceRange(target ReadOnlyBitmap, first, last uint64) ([]uint64, bool) {
+	return nil, false
+}
+
+func genericOffsetRange(target ReadOnlyBitmap, first, last uint64) Bitmap {
+	return nil
 }
