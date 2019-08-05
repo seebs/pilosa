@@ -45,12 +45,12 @@ func LookupOpBitmapViewGivesBool(target ReadOnlyBitmap, name string) OpBitmapVie
 }
 
 // Any performs a default BitmapViewGivesBool on a Bitmap.
-type interfaceHasAny interface {
+type interfaceBitmapHasAny interface {
 	AnyViewGivesBool() bool
 }
 
 func Any(target ReadOnlyBitmap) bool {
-	if target, ok := target.(interfaceHasAny); ok {
+	if target, ok := target.(interfaceBitmapHasAny); ok {
 		return target.AnyViewGivesBool()
 	}
 	return genericAny(target)
@@ -71,12 +71,12 @@ func LookupOpBitmapViewGivesBit(target ReadOnlyBitmap, name string) OpBitmapView
 }
 
 // Count performs a default BitmapViewGivesBit on a Bitmap.
-type interfaceHasCount interface {
+type interfaceBitmapHasCount interface {
 	CountViewGivesBit() uint64
 }
 
 func Count(target ReadOnlyBitmap) uint64 {
-	if target, ok := target.(interfaceHasCount); ok {
+	if target, ok := target.(interfaceBitmapHasCount); ok {
 		return target.CountViewGivesBit()
 	}
 	return genericCount(target)
@@ -97,12 +97,12 @@ func LookupOpBitmapViewRangeGivesBool(target ReadOnlyBitmap, name string) OpBitm
 }
 
 // AnyRange performs a default BitmapViewRangeGivesBool on a Bitmap.
-type interfaceHasAnyRange interface {
+type interfaceBitmapHasAnyRange interface {
 	AnyRangeViewRangeGivesBool(uint64, uint64) bool
 }
 
 func AnyRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) bool {
-	if target, ok := target.(interfaceHasAnyRange); ok {
+	if target, ok := target.(interfaceBitmapHasAnyRange); ok {
 		return target.AnyRangeViewRangeGivesBool(in1, in2)
 	}
 	return genericAnyRange(target, in1, in2)
@@ -123,12 +123,12 @@ func LookupOpBitmapViewRangeGivesBit(target ReadOnlyBitmap, name string) OpBitma
 }
 
 // CountRange performs a default BitmapViewRangeGivesBit on a Bitmap.
-type interfaceHasCountRange interface {
+type interfaceBitmapHasCountRange interface {
 	CountRangeViewRangeGivesBit(uint64, uint64) uint64
 }
 
 func CountRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) uint64 {
-	if target, ok := target.(interfaceHasCountRange); ok {
+	if target, ok := target.(interfaceBitmapHasCountRange); ok {
 		return target.CountRangeViewRangeGivesBit(in1, in2)
 	}
 	return genericCountRange(target, in1, in2)
@@ -149,12 +149,12 @@ func LookupOpBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBi
 }
 
 // OffsetRange performs a default BitmapViewRangeGivesBitmap on a Bitmap.
-type interfaceHasOffsetRange interface {
+type interfaceBitmapHasOffsetRange interface {
 	OffsetRangeViewRangeGivesBitmap(uint64, uint64) ReadOnlyBitmap
 }
 
 func OffsetRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) ReadOnlyBitmap {
-	if target, ok := target.(interfaceHasOffsetRange); ok {
+	if target, ok := target.(interfaceBitmapHasOffsetRange); ok {
 		return target.OffsetRangeViewRangeGivesBitmap(in1, in2)
 	}
 	return genericOffsetRange(target, in1, in2)
@@ -175,12 +175,12 @@ func LookupOpBitmapViewRangeGivesBitsBool(target ReadOnlyBitmap, name string) Op
 }
 
 // SliceRange performs a default BitmapViewRangeGivesBitsBool on a Bitmap.
-type interfaceHasSliceRange interface {
+type interfaceBitmapHasSliceRange interface {
 	SliceRangeViewRangeGivesBitsBool(uint64, uint64) ([]uint64, bool)
 }
 
 func SliceRange(target ReadOnlyBitmap, in1 uint64, in2 uint64) ([]uint64, bool) {
-	if target, ok := target.(interfaceHasSliceRange); ok {
+	if target, ok := target.(interfaceBitmapHasSliceRange); ok {
 		return target.SliceRangeViewRangeGivesBitsBool(in1, in2)
 	}
 	return genericSliceRange(target, in1, in2)
@@ -243,24 +243,24 @@ func LookupOpBitmapUpdateBit(target ReadOnlyBitmap, name string) OpBitmapUpdateB
 }
 
 // Add performs a default BitmapUpdateBit on a Bitmap.
-type interfaceHasAdd interface {
+type interfaceBitmapHasAdd interface {
 	AddUpdateBit(uint64) (bool, uint64, Bitmap)
 }
 
 func Add(target Bitmap, in1 uint64) (bool, uint64, Bitmap) {
-	if target, ok := target.(interfaceHasAdd); ok {
+	if target, ok := target.(interfaceBitmapHasAdd); ok {
 		return target.AddUpdateBit(in1)
 	}
 	return genericAdd(target, in1)
 }
 
 // Remove performs a default BitmapUpdateBit on a Bitmap.
-type interfaceHasRemove interface {
+type interfaceBitmapHasRemove interface {
 	RemoveUpdateBit(uint64) (bool, uint64, Bitmap)
 }
 
 func Remove(target Bitmap, in1 uint64) (bool, uint64, Bitmap) {
-	if target, ok := target.(interfaceHasRemove); ok {
+	if target, ok := target.(interfaceBitmapHasRemove); ok {
 		return target.RemoveUpdateBit(in1)
 	}
 	return genericRemove(target, in1)
@@ -365,12 +365,12 @@ func LookupOpBitmapUpdateBytes(target ReadOnlyBitmap, name string) OpBitmapUpdat
 }
 
 // ImportRoaring performs a default BitmapUpdateBytes on a Bitmap.
-type interfaceHasImportRoaring interface {
+type interfaceBitmapHasImportRoaring interface {
 	ImportRoaringUpdateBytes([]byte) (bool, uint64, Bitmap)
 }
 
 func ImportRoaring(target Bitmap, in1 []byte) (bool, uint64, Bitmap) {
-	if target, ok := target.(interfaceHasImportRoaring); ok {
+	if target, ok := target.(interfaceBitmapHasImportRoaring); ok {
 		return target.ImportRoaringUpdateBytes(in1)
 	}
 	return genericImportRoaring(target, in1)
@@ -391,12 +391,12 @@ func LookupOpBitmapViewWriterGivesError(target ReadOnlyBitmap, name string) OpBi
 }
 
 // ExportRoaring performs a default BitmapViewWriterGivesError on a Bitmap.
-type interfaceHasExportRoaring interface {
+type interfaceBitmapHasExportRoaring interface {
 	ExportRoaringViewWriterGivesError(io.Writer) error
 }
 
 func ExportRoaring(target ReadOnlyBitmap, in1 io.Writer) error {
-	if target, ok := target.(interfaceHasExportRoaring); ok {
+	if target, ok := target.(interfaceBitmapHasExportRoaring); ok {
 		return target.ExportRoaringViewWriterGivesError(in1)
 	}
 	return genericExportRoaring(target, in1)

@@ -385,13 +385,19 @@ func LookupOp%s(target ReadOnly%s, name string) Op%s {
 			}
 			// create default op implementations
 			for _, genericOpName := range defaults {
+				opPrefix := ""
+				// strip leading "Container" from
+				if strings.HasPrefix(genericOpName, dt.name) {
+					genericOpName = genericOpName[len(dt.name):]
+					opPrefix = dt.name
+				}
 				Printf("\n// %s performs a default %s on a %s.\n", genericOpName, opName, dt.name)
-				Printf("type interfaceHas%s interface {\n\t%s(%s)%s\n}\n\n", genericOpName, genericOpName+opFuncSuffix, typeList, resTypes)
-				Printf("func %s(target %s%s%s%s)%s {\n", genericOpName, readOnly, dt.name, argComma, argList, resTypes)
-				Printf("	if target, ok := target.(interfaceHas%s); ok {\n", genericOpName)
+				Printf("type interface%sHas%s interface {\n\t%s(%s)%s\n}\n\n", dt.name, genericOpName, genericOpName+opFuncSuffix, typeList, resTypes)
+				Printf("func %s%s(target %s%s%s%s)%s {\n", opPrefix, genericOpName, readOnly, dt.name, argComma, argList, resTypes)
+				Printf("	if target, ok := target.(interface%sHas%s); ok {\n", dt.name, genericOpName)
 				Printf("		return target.%s(%s)\n", genericOpName+opFuncSuffix, argNames)
 				Printf("	}\n")
-				Printf("	return generic%s(target%s%s)\n", genericOpName, argComma, argNames)
+				Printf("	return generic%s%s(target%s%s)\n", opPrefix, genericOpName, argComma, argNames)
 				Printf(`}
 `)
 			}

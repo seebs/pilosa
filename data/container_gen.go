@@ -44,6 +44,18 @@ func LookupOpContainerViewGivesBool(target ReadOnlyContainer, name string) OpCon
 	return nil
 }
 
+// Any performs a default ContainerViewGivesBool on a Container.
+type interfaceContainerHasAny interface {
+	AnyViewGivesBool() bool
+}
+
+func ContainerAny(target ReadOnlyContainer) bool {
+	if target, ok := target.(interfaceContainerHasAny); ok {
+		return target.AnyViewGivesBool()
+	}
+	return genericContainerAny(target)
+}
+
 type OpContainerViewGivesBit func() int
 
 func (OpContainerViewGivesBit) ContainerOpType() OpType { return OpTypeViewGivesBit }
@@ -56,6 +68,18 @@ func LookupOpContainerViewGivesBit(target ReadOnlyContainer, name string) OpCont
 		return OpContainerViewGivesBit(fn)
 	}
 	return nil
+}
+
+// Count performs a default ContainerViewGivesBit on a Container.
+type interfaceContainerHasCount interface {
+	CountViewGivesBit() int
+}
+
+func ContainerCount(target ReadOnlyContainer) int {
+	if target, ok := target.(interfaceContainerHasCount); ok {
+		return target.CountViewGivesBit()
+	}
+	return genericContainerCount(target)
 }
 
 type OpContainerViewRangeGivesBool func(uint16, uint16) bool

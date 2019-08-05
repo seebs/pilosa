@@ -1,6 +1,6 @@
 View
-ViewGivesBool,Bitmap:Any
-ViewGivesBit,Bitmap:Count
+ViewGivesBool,Bitmap:Any,Container:ContainerAny
+ViewGivesBit,Bitmap:Count,Container:ContainerCount
 ViewRangeGivesBool,Bitmap:AnyRange
 ViewRangeGivesBit,Bitmap:CountRange
 ViewRangeGivesOther,Bitmap:OffsetRange

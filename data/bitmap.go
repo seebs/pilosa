@@ -134,11 +134,11 @@ func genericRemove(target Bitmap, bit uint64) (bool, uint64, Bitmap) {
 }
 
 func genericAny(target ReadOnlyBitmap) bool {
-	return false
+	return genericAnyRange(target, 0, ^uint64(0))
 }
 
 func genericCount(target ReadOnlyBitmap) uint64 {
-	return 0
+	return genericCountRange(target, 0, ^uint64(0))
 }
 
 func genericAnyRange(target ReadOnlyBitmap, first, last uint64) bool {
