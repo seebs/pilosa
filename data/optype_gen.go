@@ -1,7 +1,7 @@
 package data
 
-// GENERATED CODE, DO NOT EDIT
-// Generated things from the OpTypes list (see gen/main.go)
+// optype_gen.go: GENERATED CODE, DO NOT EDIT.
+// ops.tmpl: The source for the generated code. Probably also do not edit.
 
 const (
 	OpTypeView = OpType(iota)
@@ -23,6 +23,5 @@ const (
 	OpTypeUpdateOthers
 	OpTypeUpdateBytes
 	OpTypeViewWriterGivesError
-
 	OpTypeMax
 )
