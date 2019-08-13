@@ -73,6 +73,18 @@ func OpLookupDirect{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{
 	return nil
 }
 
+// OpWrap{{.OpName}} takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrap{{.OpName}}(wrapped Op{{.OpName}}, fn func(inner func())) Op{{.OpName}} {
+	return func({{.ArgList}}){{.ResList}} {
+		inner := func() {
+			{{if .ResList}}{{.ResNames}} = wrapped({{.ArgNames}}){{else}}wrapped({{.ArgNames}}){{end}}
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOp{{.OpName}}(table OpTable{{$.Data.Name}}, name string) Op{{.OpName}} {
 	if table == nil {
 		return nil

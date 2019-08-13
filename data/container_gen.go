@@ -73,6 +73,18 @@ func OpLookupDirectContainerView(target ReadOnlyContainer, name string) OpContai
 	return nil
 }
 
+// OpWrapContainerView takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerView(wrapped OpContainerView, fn func(inner func())) OpContainerView {
+	return func() (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerView(table OpTableContainer, name string) OpContainerView {
 	if table == nil {
 		return nil
@@ -123,6 +135,18 @@ func OpLookupDirectContainerViewGivesBool(target ReadOnlyContainer, name string)
 		return OpContainerViewGivesBool(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerViewGivesBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewGivesBool(wrapped OpContainerViewGivesBool, fn func(inner func())) OpContainerViewGivesBool {
+	return func() (out1 bool) {
+		inner := func() {
+			out1 = wrapped()
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerViewGivesBool(table OpTableContainer, name string) OpContainerViewGivesBool {
@@ -189,6 +213,18 @@ func OpLookupDirectContainerViewGivesBit(target ReadOnlyContainer, name string) 
 	return nil
 }
 
+// OpWrapContainerViewGivesBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewGivesBit(wrapped OpContainerViewGivesBit, fn func(inner func())) OpContainerViewGivesBit {
+	return func() (out1 int) {
+		inner := func() {
+			out1 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewGivesBit(table OpTableContainer, name string) OpContainerViewGivesBit {
 	if table == nil {
 		return nil
@@ -253,6 +289,18 @@ func OpLookupDirectContainerViewRangeGivesBool(target ReadOnlyContainer, name st
 	return nil
 }
 
+// OpWrapContainerViewRangeGivesBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewRangeGivesBool(wrapped OpContainerViewRangeGivesBool, fn func(inner func())) OpContainerViewRangeGivesBool {
+	return func(in1 uint16, in2 uint16) (out1 bool) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewRangeGivesBool(table OpTableContainer, name string) OpContainerViewRangeGivesBool {
 	if table == nil {
 		return nil
@@ -303,6 +351,18 @@ func OpLookupDirectContainerViewRangeGivesBit(target ReadOnlyContainer, name str
 		return OpContainerViewRangeGivesBit(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerViewRangeGivesBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewRangeGivesBit(wrapped OpContainerViewRangeGivesBit, fn func(inner func())) OpContainerViewRangeGivesBit {
+	return func(in1 uint16, in2 uint16) (out1 int) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerViewRangeGivesBit(table OpTableContainer, name string) OpContainerViewRangeGivesBit {
@@ -357,6 +417,18 @@ func OpLookupDirectContainerViewRangeGivesContainer(target ReadOnlyContainer, na
 	return nil
 }
 
+// OpWrapContainerViewRangeGivesContainer takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewRangeGivesContainer(wrapped OpContainerViewRangeGivesContainer, fn func(inner func())) OpContainerViewRangeGivesContainer {
+	return func(in1 uint16, in2 uint16) (out1 ReadOnlyContainer) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewRangeGivesContainer(table OpTableContainer, name string) OpContainerViewRangeGivesContainer {
 	if table == nil {
 		return nil
@@ -407,6 +479,18 @@ func OpLookupDirectContainerViewRangeGivesBitsBool(target ReadOnlyContainer, nam
 		return OpContainerViewRangeGivesBitsBool(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerViewRangeGivesBitsBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewRangeGivesBitsBool(wrapped OpContainerViewRangeGivesBitsBool, fn func(inner func())) OpContainerViewRangeGivesBitsBool {
+	return func(in1 uint16, in2 uint16) (out1 []int, out2 bool) {
+		inner := func() {
+			out1, out2 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerViewRangeGivesBitsBool(table OpTableContainer, name string) OpContainerViewRangeGivesBitsBool {
@@ -461,6 +545,18 @@ func OpLookupDirectContainerUpdate(target ReadOnlyContainer, name string) OpCont
 	return nil
 }
 
+// OpWrapContainerUpdate takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdate(wrapped OpContainerUpdate, fn func(inner func())) OpContainerUpdate {
+	return func() (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerUpdate(table OpTableContainer, name string) OpContainerUpdate {
 	if table == nil {
 		return nil
@@ -511,6 +607,18 @@ func OpLookupDirectContainerViewRange(target ReadOnlyContainer, name string) OpC
 		return OpContainerViewRange(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerViewRange takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewRange(wrapped OpContainerViewRange, fn func(inner func())) OpContainerViewRange {
+	return func(in1 uint16, in2 uint16) (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerViewRange(table OpTableContainer, name string) OpContainerViewRange {
@@ -565,6 +673,18 @@ func OpLookupDirectContainerViewBit(target ReadOnlyContainer, name string) OpCon
 	return nil
 }
 
+// OpWrapContainerViewBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewBit(wrapped OpContainerViewBit, fn func(inner func())) OpContainerViewBit {
+	return func(in1 uint16) (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewBit(table OpTableContainer, name string) OpContainerViewBit {
 	if table == nil {
 		return nil
@@ -615,6 +735,18 @@ func OpLookupDirectContainerUpdateBit(target ReadOnlyContainer, name string) OpC
 		return OpContainerUpdateBit(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerUpdateBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdateBit(wrapped OpContainerUpdateBit, fn func(inner func())) OpContainerUpdateBit {
+	return func(in1 uint16) (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerUpdateBit(table OpTableContainer, name string) OpContainerUpdateBit {
@@ -669,6 +801,18 @@ func OpLookupDirectContainerViewContainer(target ReadOnlyContainer, name string)
 	return nil
 }
 
+// OpWrapContainerViewContainer takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewContainer(wrapped OpContainerViewContainer, fn func(inner func())) OpContainerViewContainer {
+	return func(in1 ReadOnlyContainer) (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewContainer(table OpTableContainer, name string) OpContainerViewContainer {
 	if table == nil {
 		return nil
@@ -719,6 +863,18 @@ func OpLookupDirectContainerUpdateContainer(target ReadOnlyContainer, name strin
 		return OpContainerUpdateContainer(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerUpdateContainer takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdateContainer(wrapped OpContainerUpdateContainer, fn func(inner func())) OpContainerUpdateContainer {
+	return func(in1 ReadOnlyContainer) (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerUpdateContainer(table OpTableContainer, name string) OpContainerUpdateContainer {
@@ -773,6 +929,18 @@ func OpLookupDirectContainerViewBits(target ReadOnlyContainer, name string) OpCo
 	return nil
 }
 
+// OpWrapContainerViewBits takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewBits(wrapped OpContainerViewBits, fn func(inner func())) OpContainerViewBits {
+	return func(in1 []uint16) (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewBits(table OpTableContainer, name string) OpContainerViewBits {
 	if table == nil {
 		return nil
@@ -823,6 +991,18 @@ func OpLookupDirectContainerUpdateBits(target ReadOnlyContainer, name string) Op
 		return OpContainerUpdateBits(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerUpdateBits takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdateBits(wrapped OpContainerUpdateBits, fn func(inner func())) OpContainerUpdateBits {
+	return func(in1 []uint16) (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerUpdateBits(table OpTableContainer, name string) OpContainerUpdateBits {
@@ -877,6 +1057,18 @@ func OpLookupDirectContainerViewContainers(target ReadOnlyContainer, name string
 	return nil
 }
 
+// OpWrapContainerViewContainers takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewContainers(wrapped OpContainerViewContainers, fn func(inner func())) OpContainerViewContainers {
+	return func(in1 []ReadOnlyContainer) (out1 bool, out2 int, out3 ReadOnlyContainer) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerViewContainers(table OpTableContainer, name string) OpContainerViewContainers {
 	if table == nil {
 		return nil
@@ -927,6 +1119,18 @@ func OpLookupDirectContainerUpdateContainers(target ReadOnlyContainer, name stri
 		return OpContainerUpdateContainers(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerUpdateContainers takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdateContainers(wrapped OpContainerUpdateContainers, fn func(inner func())) OpContainerUpdateContainers {
+	return func(in1 []ReadOnlyContainer) (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerUpdateContainers(table OpTableContainer, name string) OpContainerUpdateContainers {
@@ -981,6 +1185,18 @@ func OpLookupDirectContainerUpdateBytes(target ReadOnlyContainer, name string) O
 	return nil
 }
 
+// OpWrapContainerUpdateBytes takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerUpdateBytes(wrapped OpContainerUpdateBytes, fn func(inner func())) OpContainerUpdateBytes {
+	return func(in1 []byte) (out1 bool, out2 int, out3 Container) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpContainerUpdateBytes(table OpTableContainer, name string) OpContainerUpdateBytes {
 	if table == nil {
 		return nil
@@ -1031,6 +1247,18 @@ func OpLookupDirectContainerViewWriterGivesError(target ReadOnlyContainer, name 
 		return OpContainerViewWriterGivesError(fn)
 	}
 	return nil
+}
+
+// OpWrapContainerViewWriterGivesError takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapContainerViewWriterGivesError(wrapped OpContainerViewWriterGivesError, fn func(inner func())) OpContainerViewWriterGivesError {
+	return func(in1 io.Writer) (out1 error) {
+		inner := func() {
+			out1 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpContainerViewWriterGivesError(table OpTableContainer, name string) OpContainerViewWriterGivesError {

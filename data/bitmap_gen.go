@@ -73,6 +73,18 @@ func OpLookupDirectBitmapView(target ReadOnlyBitmap, name string) OpBitmapView {
 	return nil
 }
 
+// OpWrapBitmapView takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapView(wrapped OpBitmapView, fn func(inner func())) OpBitmapView {
+	return func() (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapView(table OpTableBitmap, name string) OpBitmapView {
 	if table == nil {
 		return nil
@@ -123,6 +135,18 @@ func OpLookupDirectBitmapViewGivesBool(target ReadOnlyBitmap, name string) OpBit
 		return OpBitmapViewGivesBool(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapViewGivesBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewGivesBool(wrapped OpBitmapViewGivesBool, fn func(inner func())) OpBitmapViewGivesBool {
+	return func() (out1 bool) {
+		inner := func() {
+			out1 = wrapped()
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapViewGivesBool(table OpTableBitmap, name string) OpBitmapViewGivesBool {
@@ -189,6 +213,18 @@ func OpLookupDirectBitmapViewGivesBit(target ReadOnlyBitmap, name string) OpBitm
 	return nil
 }
 
+// OpWrapBitmapViewGivesBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewGivesBit(wrapped OpBitmapViewGivesBit, fn func(inner func())) OpBitmapViewGivesBit {
+	return func() (out1 uint64) {
+		inner := func() {
+			out1 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewGivesBit(table OpTableBitmap, name string) OpBitmapViewGivesBit {
 	if table == nil {
 		return nil
@@ -251,6 +287,18 @@ func OpLookupDirectBitmapViewRangeGivesBool(target ReadOnlyBitmap, name string) 
 		return OpBitmapViewRangeGivesBool(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapViewRangeGivesBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewRangeGivesBool(wrapped OpBitmapViewRangeGivesBool, fn func(inner func())) OpBitmapViewRangeGivesBool {
+	return func(in1 uint64, in2 uint64) (out1 bool) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapViewRangeGivesBool(table OpTableBitmap, name string) OpBitmapViewRangeGivesBool {
@@ -317,6 +365,18 @@ func OpLookupDirectBitmapViewRangeGivesBit(target ReadOnlyBitmap, name string) O
 	return nil
 }
 
+// OpWrapBitmapViewRangeGivesBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewRangeGivesBit(wrapped OpBitmapViewRangeGivesBit, fn func(inner func())) OpBitmapViewRangeGivesBit {
+	return func(in1 uint64, in2 uint64) (out1 uint64) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewRangeGivesBit(table OpTableBitmap, name string) OpBitmapViewRangeGivesBit {
 	if table == nil {
 		return nil
@@ -379,6 +439,18 @@ func OpLookupDirectBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string
 		return OpBitmapViewRangeGivesBitmap(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapViewRangeGivesBitmap takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewRangeGivesBitmap(wrapped OpBitmapViewRangeGivesBitmap, fn func(inner func())) OpBitmapViewRangeGivesBitmap {
+	return func(in1 uint64, in2 uint64) (out1 ReadOnlyBitmap) {
+		inner := func() {
+			out1 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapViewRangeGivesBitmap(table OpTableBitmap, name string) OpBitmapViewRangeGivesBitmap {
@@ -445,6 +517,18 @@ func OpLookupDirectBitmapViewRangeGivesBitsBool(target ReadOnlyBitmap, name stri
 	return nil
 }
 
+// OpWrapBitmapViewRangeGivesBitsBool takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewRangeGivesBitsBool(wrapped OpBitmapViewRangeGivesBitsBool, fn func(inner func())) OpBitmapViewRangeGivesBitsBool {
+	return func(in1 uint64, in2 uint64) (out1 []uint64, out2 bool) {
+		inner := func() {
+			out1, out2 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewRangeGivesBitsBool(table OpTableBitmap, name string) OpBitmapViewRangeGivesBitsBool {
 	if table == nil {
 		return nil
@@ -509,6 +593,18 @@ func OpLookupDirectBitmapUpdate(target ReadOnlyBitmap, name string) OpBitmapUpda
 	return nil
 }
 
+// OpWrapBitmapUpdate takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdate(wrapped OpBitmapUpdate, fn func(inner func())) OpBitmapUpdate {
+	return func() (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped()
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapUpdate(table OpTableBitmap, name string) OpBitmapUpdate {
 	if table == nil {
 		return nil
@@ -559,6 +655,18 @@ func OpLookupDirectBitmapViewRange(target ReadOnlyBitmap, name string) OpBitmapV
 		return OpBitmapViewRange(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapViewRange takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewRange(wrapped OpBitmapViewRange, fn func(inner func())) OpBitmapViewRange {
+	return func(in1 uint64, in2 uint64) (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1, in2)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapViewRange(table OpTableBitmap, name string) OpBitmapViewRange {
@@ -613,6 +721,18 @@ func OpLookupDirectBitmapViewBit(target ReadOnlyBitmap, name string) OpBitmapVie
 	return nil
 }
 
+// OpWrapBitmapViewBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewBit(wrapped OpBitmapViewBit, fn func(inner func())) OpBitmapViewBit {
+	return func(in1 uint64) (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewBit(table OpTableBitmap, name string) OpBitmapViewBit {
 	if table == nil {
 		return nil
@@ -663,6 +783,18 @@ func OpLookupDirectBitmapUpdateBit(target ReadOnlyBitmap, name string) OpBitmapU
 		return OpBitmapUpdateBit(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapUpdateBit takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdateBit(wrapped OpBitmapUpdateBit, fn func(inner func())) OpBitmapUpdateBit {
+	return func(in1 uint64) (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapUpdateBit(table OpTableBitmap, name string) OpBitmapUpdateBit {
@@ -741,6 +873,18 @@ func OpLookupDirectBitmapViewBitmap(target ReadOnlyBitmap, name string) OpBitmap
 	return nil
 }
 
+// OpWrapBitmapViewBitmap takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewBitmap(wrapped OpBitmapViewBitmap, fn func(inner func())) OpBitmapViewBitmap {
+	return func(in1 ReadOnlyBitmap) (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewBitmap(table OpTableBitmap, name string) OpBitmapViewBitmap {
 	if table == nil {
 		return nil
@@ -791,6 +935,18 @@ func OpLookupDirectBitmapUpdateBitmap(target ReadOnlyBitmap, name string) OpBitm
 		return OpBitmapUpdateBitmap(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapUpdateBitmap takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdateBitmap(wrapped OpBitmapUpdateBitmap, fn func(inner func())) OpBitmapUpdateBitmap {
+	return func(in1 ReadOnlyBitmap) (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapUpdateBitmap(table OpTableBitmap, name string) OpBitmapUpdateBitmap {
@@ -845,6 +1001,18 @@ func OpLookupDirectBitmapViewBits(target ReadOnlyBitmap, name string) OpBitmapVi
 	return nil
 }
 
+// OpWrapBitmapViewBits takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewBits(wrapped OpBitmapViewBits, fn func(inner func())) OpBitmapViewBits {
+	return func(in1 []uint64) (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewBits(table OpTableBitmap, name string) OpBitmapViewBits {
 	if table == nil {
 		return nil
@@ -895,6 +1063,18 @@ func OpLookupDirectBitmapUpdateBits(target ReadOnlyBitmap, name string) OpBitmap
 		return OpBitmapUpdateBits(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapUpdateBits takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdateBits(wrapped OpBitmapUpdateBits, fn func(inner func())) OpBitmapUpdateBits {
+	return func(in1 []uint64) (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapUpdateBits(table OpTableBitmap, name string) OpBitmapUpdateBits {
@@ -949,6 +1129,18 @@ func OpLookupDirectBitmapViewBitmaps(target ReadOnlyBitmap, name string) OpBitma
 	return nil
 }
 
+// OpWrapBitmapViewBitmaps takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewBitmaps(wrapped OpBitmapViewBitmaps, fn func(inner func())) OpBitmapViewBitmaps {
+	return func(in1 []ReadOnlyBitmap) (out1 bool, out2 uint64, out3 ReadOnlyBitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapViewBitmaps(table OpTableBitmap, name string) OpBitmapViewBitmaps {
 	if table == nil {
 		return nil
@@ -1001,6 +1193,18 @@ func OpLookupDirectBitmapUpdateBitmaps(target ReadOnlyBitmap, name string) OpBit
 	return nil
 }
 
+// OpWrapBitmapUpdateBitmaps takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdateBitmaps(wrapped OpBitmapUpdateBitmaps, fn func(inner func())) OpBitmapUpdateBitmaps {
+	return func(in1 []ReadOnlyBitmap) (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
+}
+
 func LookupTableOpBitmapUpdateBitmaps(table OpTableBitmap, name string) OpBitmapUpdateBitmaps {
 	if table == nil {
 		return nil
@@ -1051,6 +1255,18 @@ func OpLookupDirectBitmapUpdateBytes(target ReadOnlyBitmap, name string) OpBitma
 		return OpBitmapUpdateBytes(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapUpdateBytes takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapUpdateBytes(wrapped OpBitmapUpdateBytes, fn func(inner func())) OpBitmapUpdateBytes {
+	return func(in1 []byte) (out1 bool, out2 uint64, out3 Bitmap) {
+		inner := func() {
+			out1, out2, out3 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapUpdateBytes(table OpTableBitmap, name string) OpBitmapUpdateBytes {
@@ -1115,6 +1331,18 @@ func OpLookupDirectBitmapViewWriterGivesError(target ReadOnlyBitmap, name string
 		return OpBitmapViewWriterGivesError(fn)
 	}
 	return nil
+}
+
+// OpWrapBitmapViewWriterGivesError takes a function which takes a function, and gives
+// you a function which wraps a provided operation in that function.
+func OpWrapBitmapViewWriterGivesError(wrapped OpBitmapViewWriterGivesError, fn func(inner func())) OpBitmapViewWriterGivesError {
+	return func(in1 io.Writer) (out1 error) {
+		inner := func() {
+			out1 = wrapped(in1)
+		}
+		fn(inner)
+		return
+	}
 }
 
 func LookupTableOpBitmapViewWriterGivesError(table OpTableBitmap, name string) OpBitmapViewWriterGivesError {
