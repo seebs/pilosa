@@ -17,6 +17,7 @@ type ReadOnlyContainer interface {
 	Slice() Slice
 	// Runs yields the container's contents as a slice of runs.
 	Runs() Runs
+	OpLookup(typ OpType, name string) OpFunctionContainer
 }
 
 // Container represents a writeable container -- or at least, a container which

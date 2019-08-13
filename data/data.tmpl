@@ -19,25 +19,38 @@ type OpFunction{{.Data.Name}} interface {
 // OpTableGeneric{{.Data.Name}}, similarly, lets us specify a range of types -- in
 // this case, map[string]OpFunctionType, where the type is one of the
 // specific op function types defined.
-type OpTableGeneric{{.Data.Name}} interface {
+type OpTable{{.Data.Name}}Generic interface {
 	{{.Data.Name}}OpTypeTable() OpType
 }
 
 // OpTable{{.Data.Name}} is a slice mapping optypes to map[string]opFunc,
 // where any specific map will actually be a map with a concrete type of
 // op function. We defined the
-type OpTable{{.Data.Name}} []OpTableGeneric
-
-{{- range .Ops }}
-
+type OpTable{{.Data.Name}} []OpTable{{.Data.Name}}Generic
+{{ range .Ops }}
 // Implementation stuff for Op{{.OpName}}, the {{$.Data.Name}}-specific
 // form of {{.Op.Full}}.
 type Op{{.OpName}} {{.LiteralFuncType}}
-func (Op{{.OpName}}) {{$.Data.Name}}OpType() { return {{.Op.Full}} }
-type OpTable{{.OpName}} map[string]op{{.OpName}}
-func (OpTable{{.OpName}}) {{$.Data.Name}}OpTypeTable() OpType { return {{.Op.Full}} }
 
-func LookupOp{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
+func (Op{{.OpName}}) {{$.Data.Name}}OpType() OpType {
+	return {{.Op.Full}}
+}
+
+type OpTable{{.OpName}} map[string]Op{{.OpName}}
+
+func (OpTable{{.OpName}}) {{$.Data.Name}}OpTypeTable() OpType {
+	return {{.Op.Full}}
+}
+
+func OpLookup{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
+	method := target.OpLookup({{.Op.Full}}, name)
+	if method != nil {
+		return method.(Op{{.OpName}})
+	}
+	return nil
+}
+
+func OpLookupGeneric{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "{{.OpFuncSuffix}}")
 	if method.IsValid() {
@@ -51,7 +64,7 @@ func LookupTableOp{{.OpName}}(table OpTable{{$.Data.Name}}, name string) Op{{.Op
 	if table == nil {
 		return nil
 	}
-	subTable := table[{{.OpName}}]
+	subTable := table[{{.Op.Full}}]
 	if subTable == nil {
 		return nil
 	}
@@ -60,18 +73,30 @@ func LookupTableOp{{.OpName}}(table OpTable{{$.Data.Name}}, name string) Op{{.Op
 		return nil
 	}
 	return tab[name]
-}
-{{ $parent := . }}{{ range .Defaults}}
+}{{ $parent := . }}
+{{- range .Defaults }}
+
 // {{.Name}} performs a default {{$parent.OpName}} on a {{$.Data.Name}}
 type interface{{$.Data.Name}}Has{{.Name}} interface {
 	{{.Name}}{{$parent.OpFuncSuffix}}({{$parent.TypeList}}){{$parent.ResTypes}}
 }
+
 func {{.Prefix}}{{.Name}}(target {{$parent.ReadOnly}}{{$.Data.Name}}{{$parent.ArgComma}}{{$parent.ArgList}}){{$parent.ResTypes}} {
 	if target, ok := target.(interface{{$.Data.Name}}Has{{.Name}}); ok {
 		return target.{{.Name}}{{$parent.OpFuncSuffix}}({{$parent.ArgNames}})
 	}
 	return generic{{.Prefix}}{{.Name}}(target{{$parent.ArgComma}}{{$parent.ArgNames}})
 }
-{{- else -}}// No Defaults{{end -}}
+{{- end}}
 {{end}}
+// Op{{$.Data.Name}}LookupGeneric is a generic lookup function which just looks things up by
+// name, using code-generation and a naming convention.
+func Op{{$.Data.Name}}LookupGeneric(target ReadOnly{{$.Data.Name}}, typ OpType, name string) OpFunction{{.Data.Name}} {
+	switch typ {
+{{- range .Ops}}
+	case {{.Op.Full}}:
+		return OpLookupGeneric{{.OpName}}(target, name)
+{{- end}}
+	}
+	return nil
 }

@@ -19,23 +19,38 @@ type OpFunctionContainer interface {
 // OpTableGenericContainer, similarly, lets us specify a range of types -- in
 // this case, map[string]OpFunctionType, where the type is one of the
 // specific op function types defined.
-type OpTableGenericContainer interface {
+type OpTableContainerGeneric interface {
 	ContainerOpTypeTable() OpType
 }
 
 // OpTableContainer is a slice mapping optypes to map[string]opFunc,
 // where any specific map will actually be a map with a concrete type of
 // op function. We defined the
-type OpTableContainer []OpTableGeneric
+type OpTableContainer []OpTableContainerGeneric
 
-// Implementation stuff for ContainerView, the Container-specific
+// Implementation stuff for OpContainerView, the Container-specific
 // form of OpTypeView.
 type OpContainerView func() (bool, int, ReadOnlyContainer)
-func (OpContainerView) ContainerOpType() { return OpTypeView }
-type OpTableContainerView map[string]opContainerView
-func (OpTableContainerView) ContainerOpTypeTable() OpType { return OpTypeView }
 
-func LookupOpContainerView(target ReadOnlyContainer, name string) OpContainerView {
+func (OpContainerView) ContainerOpType() OpType {
+	return OpTypeView
+}
+
+type OpTableContainerView map[string]OpContainerView
+
+func (OpTableContainerView) ContainerOpTypeTable() OpType {
+	return OpTypeView
+}
+
+func OpLookupContainerView(target ReadOnlyContainer, name string) OpContainerView {
+	method := target.OpLookup(OpTypeView, name)
+	if method != nil {
+		return method.(OpContainerView)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerView(target ReadOnlyContainer, name string) OpContainerView {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "View")
 	if method.IsValid() {
@@ -49,7 +64,7 @@ func LookupTableOpContainerView(table OpTableContainer, name string) OpContainer
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerView]
+	subTable := table[OpTypeView]
 	if subTable == nil {
 		return nil
 	}
@@ -59,16 +74,30 @@ func LookupTableOpContainerView(table OpTableContainer, name string) OpContainer
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewGivesBool, the Container-specific
+// Implementation stuff for OpContainerViewGivesBool, the Container-specific
 // form of OpTypeViewGivesBool.
 type OpContainerViewGivesBool func() bool
-func (OpContainerViewGivesBool) ContainerOpType() { return OpTypeViewGivesBool }
-type OpTableContainerViewGivesBool map[string]opContainerViewGivesBool
-func (OpTableContainerViewGivesBool) ContainerOpTypeTable() OpType { return OpTypeViewGivesBool }
 
-func LookupOpContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
+func (OpContainerViewGivesBool) ContainerOpType() OpType {
+	return OpTypeViewGivesBool
+}
+
+type OpTableContainerViewGivesBool map[string]OpContainerViewGivesBool
+
+func (OpTableContainerViewGivesBool) ContainerOpTypeTable() OpType {
+	return OpTypeViewGivesBool
+}
+
+func OpLookupContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
+	method := target.OpLookup(OpTypeViewGivesBool, name)
+	if method != nil {
+		return method.(OpContainerViewGivesBool)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBool")
 	if method.IsValid() {
@@ -82,7 +111,7 @@ func LookupTableOpContainerViewGivesBool(table OpTableContainer, name string) Op
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewGivesBool]
+	subTable := table[OpTypeViewGivesBool]
 	if subTable == nil {
 		return nil
 	}
@@ -97,6 +126,7 @@ func LookupTableOpContainerViewGivesBool(table OpTableContainer, name string) Op
 type interfaceContainerHasAny interface {
 	AnyViewGivesBool() bool
 }
+
 func ContainerAny(target ReadOnlyContainer) bool {
 	if target, ok := target.(interfaceContainerHasAny); ok {
 		return target.AnyViewGivesBool()
@@ -104,14 +134,29 @@ func ContainerAny(target ReadOnlyContainer) bool {
 	return genericContainerAny(target)
 }
 
-// Implementation stuff for ContainerViewGivesBit, the Container-specific
+// Implementation stuff for OpContainerViewGivesBit, the Container-specific
 // form of OpTypeViewGivesBit.
 type OpContainerViewGivesBit func() int
-func (OpContainerViewGivesBit) ContainerOpType() { return OpTypeViewGivesBit }
-type OpTableContainerViewGivesBit map[string]opContainerViewGivesBit
-func (OpTableContainerViewGivesBit) ContainerOpTypeTable() OpType { return OpTypeViewGivesBit }
 
-func LookupOpContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
+func (OpContainerViewGivesBit) ContainerOpType() OpType {
+	return OpTypeViewGivesBit
+}
+
+type OpTableContainerViewGivesBit map[string]OpContainerViewGivesBit
+
+func (OpTableContainerViewGivesBit) ContainerOpTypeTable() OpType {
+	return OpTypeViewGivesBit
+}
+
+func OpLookupContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
+	method := target.OpLookup(OpTypeViewGivesBit, name)
+	if method != nil {
+		return method.(OpContainerViewGivesBit)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBit")
 	if method.IsValid() {
@@ -125,7 +170,7 @@ func LookupTableOpContainerViewGivesBit(table OpTableContainer, name string) OpC
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewGivesBit]
+	subTable := table[OpTypeViewGivesBit]
 	if subTable == nil {
 		return nil
 	}
@@ -140,6 +185,7 @@ func LookupTableOpContainerViewGivesBit(table OpTableContainer, name string) OpC
 type interfaceContainerHasCount interface {
 	CountViewGivesBit() int
 }
+
 func ContainerCount(target ReadOnlyContainer) int {
 	if target, ok := target.(interfaceContainerHasCount); ok {
 		return target.CountViewGivesBit()
@@ -147,14 +193,29 @@ func ContainerCount(target ReadOnlyContainer) int {
 	return genericContainerCount(target)
 }
 
-// Implementation stuff for ContainerViewRangeGivesBool, the Container-specific
+// Implementation stuff for OpContainerViewRangeGivesBool, the Container-specific
 // form of OpTypeViewRangeGivesBool.
 type OpContainerViewRangeGivesBool func(uint16, uint16) bool
-func (OpContainerViewRangeGivesBool) ContainerOpType() { return OpTypeViewRangeGivesBool }
-type OpTableContainerViewRangeGivesBool map[string]opContainerViewRangeGivesBool
-func (OpTableContainerViewRangeGivesBool) ContainerOpTypeTable() OpType { return OpTypeViewRangeGivesBool }
 
-func LookupOpContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
+func (OpContainerViewRangeGivesBool) ContainerOpType() OpType {
+	return OpTypeViewRangeGivesBool
+}
+
+type OpTableContainerViewRangeGivesBool map[string]OpContainerViewRangeGivesBool
+
+func (OpTableContainerViewRangeGivesBool) ContainerOpTypeTable() OpType {
+	return OpTypeViewRangeGivesBool
+}
+
+func OpLookupContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
+	method := target.OpLookup(OpTypeViewRangeGivesBool, name)
+	if method != nil {
+		return method.(OpContainerViewRangeGivesBool)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBool")
 	if method.IsValid() {
@@ -168,7 +229,7 @@ func LookupTableOpContainerViewRangeGivesBool(table OpTableContainer, name strin
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewRangeGivesBool]
+	subTable := table[OpTypeViewRangeGivesBool]
 	if subTable == nil {
 		return nil
 	}
@@ -178,16 +239,30 @@ func LookupTableOpContainerViewRangeGivesBool(table OpTableContainer, name strin
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewRangeGivesBit, the Container-specific
+// Implementation stuff for OpContainerViewRangeGivesBit, the Container-specific
 // form of OpTypeViewRangeGivesBit.
 type OpContainerViewRangeGivesBit func(uint16, uint16) int
-func (OpContainerViewRangeGivesBit) ContainerOpType() { return OpTypeViewRangeGivesBit }
-type OpTableContainerViewRangeGivesBit map[string]opContainerViewRangeGivesBit
-func (OpTableContainerViewRangeGivesBit) ContainerOpTypeTable() OpType { return OpTypeViewRangeGivesBit }
 
-func LookupOpContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
+func (OpContainerViewRangeGivesBit) ContainerOpType() OpType {
+	return OpTypeViewRangeGivesBit
+}
+
+type OpTableContainerViewRangeGivesBit map[string]OpContainerViewRangeGivesBit
+
+func (OpTableContainerViewRangeGivesBit) ContainerOpTypeTable() OpType {
+	return OpTypeViewRangeGivesBit
+}
+
+func OpLookupContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
+	method := target.OpLookup(OpTypeViewRangeGivesBit, name)
+	if method != nil {
+		return method.(OpContainerViewRangeGivesBit)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBit")
 	if method.IsValid() {
@@ -201,7 +276,7 @@ func LookupTableOpContainerViewRangeGivesBit(table OpTableContainer, name string
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewRangeGivesBit]
+	subTable := table[OpTypeViewRangeGivesBit]
 	if subTable == nil {
 		return nil
 	}
@@ -211,16 +286,30 @@ func LookupTableOpContainerViewRangeGivesBit(table OpTableContainer, name string
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewRangeGivesContainer, the Container-specific
+// Implementation stuff for OpContainerViewRangeGivesContainer, the Container-specific
 // form of OpTypeViewRangeGivesOther.
 type OpContainerViewRangeGivesContainer func(uint16, uint16) ReadOnlyContainer
-func (OpContainerViewRangeGivesContainer) ContainerOpType() { return OpTypeViewRangeGivesOther }
-type OpTableContainerViewRangeGivesContainer map[string]opContainerViewRangeGivesContainer
-func (OpTableContainerViewRangeGivesContainer) ContainerOpTypeTable() OpType { return OpTypeViewRangeGivesOther }
 
-func LookupOpContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
+func (OpContainerViewRangeGivesContainer) ContainerOpType() OpType {
+	return OpTypeViewRangeGivesOther
+}
+
+type OpTableContainerViewRangeGivesContainer map[string]OpContainerViewRangeGivesContainer
+
+func (OpTableContainerViewRangeGivesContainer) ContainerOpTypeTable() OpType {
+	return OpTypeViewRangeGivesOther
+}
+
+func OpLookupContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
+	method := target.OpLookup(OpTypeViewRangeGivesOther, name)
+	if method != nil {
+		return method.(OpContainerViewRangeGivesContainer)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesContainer")
 	if method.IsValid() {
@@ -234,7 +323,7 @@ func LookupTableOpContainerViewRangeGivesContainer(table OpTableContainer, name 
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewRangeGivesContainer]
+	subTable := table[OpTypeViewRangeGivesOther]
 	if subTable == nil {
 		return nil
 	}
@@ -244,16 +333,30 @@ func LookupTableOpContainerViewRangeGivesContainer(table OpTableContainer, name 
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewRangeGivesBitsBool, the Container-specific
+// Implementation stuff for OpContainerViewRangeGivesBitsBool, the Container-specific
 // form of OpTypeViewRangeGivesBitsBool.
 type OpContainerViewRangeGivesBitsBool func(uint16, uint16) ([]int, bool)
-func (OpContainerViewRangeGivesBitsBool) ContainerOpType() { return OpTypeViewRangeGivesBitsBool }
-type OpTableContainerViewRangeGivesBitsBool map[string]opContainerViewRangeGivesBitsBool
-func (OpTableContainerViewRangeGivesBitsBool) ContainerOpTypeTable() OpType { return OpTypeViewRangeGivesBitsBool }
 
-func LookupOpContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
+func (OpContainerViewRangeGivesBitsBool) ContainerOpType() OpType {
+	return OpTypeViewRangeGivesBitsBool
+}
+
+type OpTableContainerViewRangeGivesBitsBool map[string]OpContainerViewRangeGivesBitsBool
+
+func (OpTableContainerViewRangeGivesBitsBool) ContainerOpTypeTable() OpType {
+	return OpTypeViewRangeGivesBitsBool
+}
+
+func OpLookupContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
+	method := target.OpLookup(OpTypeViewRangeGivesBitsBool, name)
+	if method != nil {
+		return method.(OpContainerViewRangeGivesBitsBool)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBitsBool")
 	if method.IsValid() {
@@ -267,7 +370,7 @@ func LookupTableOpContainerViewRangeGivesBitsBool(table OpTableContainer, name s
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewRangeGivesBitsBool]
+	subTable := table[OpTypeViewRangeGivesBitsBool]
 	if subTable == nil {
 		return nil
 	}
@@ -277,16 +380,30 @@ func LookupTableOpContainerViewRangeGivesBitsBool(table OpTableContainer, name s
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdate, the Container-specific
+// Implementation stuff for OpContainerUpdate, the Container-specific
 // form of OpTypeUpdate.
 type OpContainerUpdate func() (bool, int, Container)
-func (OpContainerUpdate) ContainerOpType() { return OpTypeUpdate }
-type OpTableContainerUpdate map[string]opContainerUpdate
-func (OpTableContainerUpdate) ContainerOpTypeTable() OpType { return OpTypeUpdate }
 
-func LookupOpContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
+func (OpContainerUpdate) ContainerOpType() OpType {
+	return OpTypeUpdate
+}
+
+type OpTableContainerUpdate map[string]OpContainerUpdate
+
+func (OpTableContainerUpdate) ContainerOpTypeTable() OpType {
+	return OpTypeUpdate
+}
+
+func OpLookupContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
+	method := target.OpLookup(OpTypeUpdate, name)
+	if method != nil {
+		return method.(OpContainerUpdate)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "Update")
 	if method.IsValid() {
@@ -300,7 +417,7 @@ func LookupTableOpContainerUpdate(table OpTableContainer, name string) OpContain
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdate]
+	subTable := table[OpTypeUpdate]
 	if subTable == nil {
 		return nil
 	}
@@ -310,16 +427,30 @@ func LookupTableOpContainerUpdate(table OpTableContainer, name string) OpContain
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewRange, the Container-specific
+// Implementation stuff for OpContainerViewRange, the Container-specific
 // form of OpTypeViewRange.
 type OpContainerViewRange func(uint16, uint16) (bool, int, ReadOnlyContainer)
-func (OpContainerViewRange) ContainerOpType() { return OpTypeViewRange }
-type OpTableContainerViewRange map[string]opContainerViewRange
-func (OpTableContainerViewRange) ContainerOpTypeTable() OpType { return OpTypeViewRange }
 
-func LookupOpContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
+func (OpContainerViewRange) ContainerOpType() OpType {
+	return OpTypeViewRange
+}
+
+type OpTableContainerViewRange map[string]OpContainerViewRange
+
+func (OpTableContainerViewRange) ContainerOpTypeTable() OpType {
+	return OpTypeViewRange
+}
+
+func OpLookupContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
+	method := target.OpLookup(OpTypeViewRange, name)
+	if method != nil {
+		return method.(OpContainerViewRange)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRange")
 	if method.IsValid() {
@@ -333,7 +464,7 @@ func LookupTableOpContainerViewRange(table OpTableContainer, name string) OpCont
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewRange]
+	subTable := table[OpTypeViewRange]
 	if subTable == nil {
 		return nil
 	}
@@ -343,16 +474,30 @@ func LookupTableOpContainerViewRange(table OpTableContainer, name string) OpCont
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewBit, the Container-specific
+// Implementation stuff for OpContainerViewBit, the Container-specific
 // form of OpTypeViewBit.
 type OpContainerViewBit func(uint16) (bool, int, ReadOnlyContainer)
-func (OpContainerViewBit) ContainerOpType() { return OpTypeViewBit }
-type OpTableContainerViewBit map[string]opContainerViewBit
-func (OpTableContainerViewBit) ContainerOpTypeTable() OpType { return OpTypeViewBit }
 
-func LookupOpContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
+func (OpContainerViewBit) ContainerOpType() OpType {
+	return OpTypeViewBit
+}
+
+type OpTableContainerViewBit map[string]OpContainerViewBit
+
+func (OpTableContainerViewBit) ContainerOpTypeTable() OpType {
+	return OpTypeViewBit
+}
+
+func OpLookupContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
+	method := target.OpLookup(OpTypeViewBit, name)
+	if method != nil {
+		return method.(OpContainerViewBit)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBit")
 	if method.IsValid() {
@@ -366,7 +511,7 @@ func LookupTableOpContainerViewBit(table OpTableContainer, name string) OpContai
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewBit]
+	subTable := table[OpTypeViewBit]
 	if subTable == nil {
 		return nil
 	}
@@ -376,16 +521,30 @@ func LookupTableOpContainerViewBit(table OpTableContainer, name string) OpContai
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdateBit, the Container-specific
+// Implementation stuff for OpContainerUpdateBit, the Container-specific
 // form of OpTypeUpdateBit.
 type OpContainerUpdateBit func(uint16) (bool, int, Container)
-func (OpContainerUpdateBit) ContainerOpType() { return OpTypeUpdateBit }
-type OpTableContainerUpdateBit map[string]opContainerUpdateBit
-func (OpTableContainerUpdateBit) ContainerOpTypeTable() OpType { return OpTypeUpdateBit }
 
-func LookupOpContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
+func (OpContainerUpdateBit) ContainerOpType() OpType {
+	return OpTypeUpdateBit
+}
+
+type OpTableContainerUpdateBit map[string]OpContainerUpdateBit
+
+func (OpTableContainerUpdateBit) ContainerOpTypeTable() OpType {
+	return OpTypeUpdateBit
+}
+
+func OpLookupContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
+	method := target.OpLookup(OpTypeUpdateBit, name)
+	if method != nil {
+		return method.(OpContainerUpdateBit)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBit")
 	if method.IsValid() {
@@ -399,7 +558,7 @@ func LookupTableOpContainerUpdateBit(table OpTableContainer, name string) OpCont
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdateBit]
+	subTable := table[OpTypeUpdateBit]
 	if subTable == nil {
 		return nil
 	}
@@ -409,16 +568,30 @@ func LookupTableOpContainerUpdateBit(table OpTableContainer, name string) OpCont
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewContainer, the Container-specific
+// Implementation stuff for OpContainerViewContainer, the Container-specific
 // form of OpTypeViewOther.
 type OpContainerViewContainer func(ReadOnlyContainer) (bool, int, ReadOnlyContainer)
-func (OpContainerViewContainer) ContainerOpType() { return OpTypeViewOther }
-type OpTableContainerViewContainer map[string]opContainerViewContainer
-func (OpTableContainerViewContainer) ContainerOpTypeTable() OpType { return OpTypeViewOther }
 
-func LookupOpContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
+func (OpContainerViewContainer) ContainerOpType() OpType {
+	return OpTypeViewOther
+}
+
+type OpTableContainerViewContainer map[string]OpContainerViewContainer
+
+func (OpTableContainerViewContainer) ContainerOpTypeTable() OpType {
+	return OpTypeViewOther
+}
+
+func OpLookupContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
+	method := target.OpLookup(OpTypeViewOther, name)
+	if method != nil {
+		return method.(OpContainerViewContainer)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainer")
 	if method.IsValid() {
@@ -432,7 +605,7 @@ func LookupTableOpContainerViewContainer(table OpTableContainer, name string) Op
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewContainer]
+	subTable := table[OpTypeViewOther]
 	if subTable == nil {
 		return nil
 	}
@@ -442,16 +615,30 @@ func LookupTableOpContainerViewContainer(table OpTableContainer, name string) Op
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdateContainer, the Container-specific
+// Implementation stuff for OpContainerUpdateContainer, the Container-specific
 // form of OpTypeUpdateOther.
 type OpContainerUpdateContainer func(ReadOnlyContainer) (bool, int, Container)
-func (OpContainerUpdateContainer) ContainerOpType() { return OpTypeUpdateOther }
-type OpTableContainerUpdateContainer map[string]opContainerUpdateContainer
-func (OpTableContainerUpdateContainer) ContainerOpTypeTable() OpType { return OpTypeUpdateOther }
 
-func LookupOpContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
+func (OpContainerUpdateContainer) ContainerOpType() OpType {
+	return OpTypeUpdateOther
+}
+
+type OpTableContainerUpdateContainer map[string]OpContainerUpdateContainer
+
+func (OpTableContainerUpdateContainer) ContainerOpTypeTable() OpType {
+	return OpTypeUpdateOther
+}
+
+func OpLookupContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
+	method := target.OpLookup(OpTypeUpdateOther, name)
+	if method != nil {
+		return method.(OpContainerUpdateContainer)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainer")
 	if method.IsValid() {
@@ -465,7 +652,7 @@ func LookupTableOpContainerUpdateContainer(table OpTableContainer, name string) 
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdateContainer]
+	subTable := table[OpTypeUpdateOther]
 	if subTable == nil {
 		return nil
 	}
@@ -475,16 +662,30 @@ func LookupTableOpContainerUpdateContainer(table OpTableContainer, name string) 
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewBits, the Container-specific
+// Implementation stuff for OpContainerViewBits, the Container-specific
 // form of OpTypeViewBits.
 type OpContainerViewBits func([]uint16) (bool, int, ReadOnlyContainer)
-func (OpContainerViewBits) ContainerOpType() { return OpTypeViewBits }
-type OpTableContainerViewBits map[string]opContainerViewBits
-func (OpTableContainerViewBits) ContainerOpTypeTable() OpType { return OpTypeViewBits }
 
-func LookupOpContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
+func (OpContainerViewBits) ContainerOpType() OpType {
+	return OpTypeViewBits
+}
+
+type OpTableContainerViewBits map[string]OpContainerViewBits
+
+func (OpTableContainerViewBits) ContainerOpTypeTable() OpType {
+	return OpTypeViewBits
+}
+
+func OpLookupContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
+	method := target.OpLookup(OpTypeViewBits, name)
+	if method != nil {
+		return method.(OpContainerViewBits)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBits")
 	if method.IsValid() {
@@ -498,7 +699,7 @@ func LookupTableOpContainerViewBits(table OpTableContainer, name string) OpConta
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewBits]
+	subTable := table[OpTypeViewBits]
 	if subTable == nil {
 		return nil
 	}
@@ -508,16 +709,30 @@ func LookupTableOpContainerViewBits(table OpTableContainer, name string) OpConta
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdateBits, the Container-specific
+// Implementation stuff for OpContainerUpdateBits, the Container-specific
 // form of OpTypeUpdateBits.
 type OpContainerUpdateBits func([]uint16) (bool, int, Container)
-func (OpContainerUpdateBits) ContainerOpType() { return OpTypeUpdateBits }
-type OpTableContainerUpdateBits map[string]opContainerUpdateBits
-func (OpTableContainerUpdateBits) ContainerOpTypeTable() OpType { return OpTypeUpdateBits }
 
-func LookupOpContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
+func (OpContainerUpdateBits) ContainerOpType() OpType {
+	return OpTypeUpdateBits
+}
+
+type OpTableContainerUpdateBits map[string]OpContainerUpdateBits
+
+func (OpTableContainerUpdateBits) ContainerOpTypeTable() OpType {
+	return OpTypeUpdateBits
+}
+
+func OpLookupContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
+	method := target.OpLookup(OpTypeUpdateBits, name)
+	if method != nil {
+		return method.(OpContainerUpdateBits)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBits")
 	if method.IsValid() {
@@ -531,7 +746,7 @@ func LookupTableOpContainerUpdateBits(table OpTableContainer, name string) OpCon
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdateBits]
+	subTable := table[OpTypeUpdateBits]
 	if subTable == nil {
 		return nil
 	}
@@ -541,16 +756,30 @@ func LookupTableOpContainerUpdateBits(table OpTableContainer, name string) OpCon
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewContainers, the Container-specific
+// Implementation stuff for OpContainerViewContainers, the Container-specific
 // form of OpTypeViewOthers.
 type OpContainerViewContainers func([]ReadOnlyContainer) (bool, int, ReadOnlyContainer)
-func (OpContainerViewContainers) ContainerOpType() { return OpTypeViewOthers }
-type OpTableContainerViewContainers map[string]opContainerViewContainers
-func (OpTableContainerViewContainers) ContainerOpTypeTable() OpType { return OpTypeViewOthers }
 
-func LookupOpContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
+func (OpContainerViewContainers) ContainerOpType() OpType {
+	return OpTypeViewOthers
+}
+
+type OpTableContainerViewContainers map[string]OpContainerViewContainers
+
+func (OpTableContainerViewContainers) ContainerOpTypeTable() OpType {
+	return OpTypeViewOthers
+}
+
+func OpLookupContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
+	method := target.OpLookup(OpTypeViewOthers, name)
+	if method != nil {
+		return method.(OpContainerViewContainers)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainers")
 	if method.IsValid() {
@@ -564,7 +793,7 @@ func LookupTableOpContainerViewContainers(table OpTableContainer, name string) O
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewContainers]
+	subTable := table[OpTypeViewOthers]
 	if subTable == nil {
 		return nil
 	}
@@ -574,16 +803,30 @@ func LookupTableOpContainerViewContainers(table OpTableContainer, name string) O
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdateContainers, the Container-specific
+// Implementation stuff for OpContainerUpdateContainers, the Container-specific
 // form of OpTypeUpdateOthers.
 type OpContainerUpdateContainers func([]ReadOnlyContainer) (bool, int, Container)
-func (OpContainerUpdateContainers) ContainerOpType() { return OpTypeUpdateOthers }
-type OpTableContainerUpdateContainers map[string]opContainerUpdateContainers
-func (OpTableContainerUpdateContainers) ContainerOpTypeTable() OpType { return OpTypeUpdateOthers }
 
-func LookupOpContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
+func (OpContainerUpdateContainers) ContainerOpType() OpType {
+	return OpTypeUpdateOthers
+}
+
+type OpTableContainerUpdateContainers map[string]OpContainerUpdateContainers
+
+func (OpTableContainerUpdateContainers) ContainerOpTypeTable() OpType {
+	return OpTypeUpdateOthers
+}
+
+func OpLookupContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
+	method := target.OpLookup(OpTypeUpdateOthers, name)
+	if method != nil {
+		return method.(OpContainerUpdateContainers)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainers")
 	if method.IsValid() {
@@ -597,7 +840,7 @@ func LookupTableOpContainerUpdateContainers(table OpTableContainer, name string)
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdateContainers]
+	subTable := table[OpTypeUpdateOthers]
 	if subTable == nil {
 		return nil
 	}
@@ -607,16 +850,30 @@ func LookupTableOpContainerUpdateContainers(table OpTableContainer, name string)
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerUpdateBytes, the Container-specific
+// Implementation stuff for OpContainerUpdateBytes, the Container-specific
 // form of OpTypeUpdateBytes.
 type OpContainerUpdateBytes func([]byte) (bool, int, Container)
-func (OpContainerUpdateBytes) ContainerOpType() { return OpTypeUpdateBytes }
-type OpTableContainerUpdateBytes map[string]opContainerUpdateBytes
-func (OpTableContainerUpdateBytes) ContainerOpTypeTable() OpType { return OpTypeUpdateBytes }
 
-func LookupOpContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
+func (OpContainerUpdateBytes) ContainerOpType() OpType {
+	return OpTypeUpdateBytes
+}
+
+type OpTableContainerUpdateBytes map[string]OpContainerUpdateBytes
+
+func (OpTableContainerUpdateBytes) ContainerOpTypeTable() OpType {
+	return OpTypeUpdateBytes
+}
+
+func OpLookupContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
+	method := target.OpLookup(OpTypeUpdateBytes, name)
+	if method != nil {
+		return method.(OpContainerUpdateBytes)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBytes")
 	if method.IsValid() {
@@ -630,7 +887,7 @@ func LookupTableOpContainerUpdateBytes(table OpTableContainer, name string) OpCo
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerUpdateBytes]
+	subTable := table[OpTypeUpdateBytes]
 	if subTable == nil {
 		return nil
 	}
@@ -640,16 +897,30 @@ func LookupTableOpContainerUpdateBytes(table OpTableContainer, name string) OpCo
 	}
 	return tab[name]
 }
-// No Defaults
 
-// Implementation stuff for ContainerViewWriterGivesError, the Container-specific
+// Implementation stuff for OpContainerViewWriterGivesError, the Container-specific
 // form of OpTypeViewWriterGivesError.
 type OpContainerViewWriterGivesError func(io.Writer) error
-func (OpContainerViewWriterGivesError) ContainerOpType() { return OpTypeViewWriterGivesError }
-type OpTableContainerViewWriterGivesError map[string]opContainerViewWriterGivesError
-func (OpTableContainerViewWriterGivesError) ContainerOpTypeTable() OpType { return OpTypeViewWriterGivesError }
 
-func LookupOpContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
+func (OpContainerViewWriterGivesError) ContainerOpType() OpType {
+	return OpTypeViewWriterGivesError
+}
+
+type OpTableContainerViewWriterGivesError map[string]OpContainerViewWriterGivesError
+
+func (OpTableContainerViewWriterGivesError) ContainerOpTypeTable() OpType {
+	return OpTypeViewWriterGivesError
+}
+
+func OpLookupContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
+	method := target.OpLookup(OpTypeViewWriterGivesError, name)
+	if method != nil {
+		return method.(OpContainerViewWriterGivesError)
+	}
+	return nil
+}
+
+func OpLookupGenericContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewWriterGivesError")
 	if method.IsValid() {
@@ -663,7 +934,7 @@ func LookupTableOpContainerViewWriterGivesError(table OpTableContainer, name str
 	if table == nil {
 		return nil
 	}
-	subTable := table[ContainerViewWriterGivesError]
+	subTable := table[OpTypeViewWriterGivesError]
 	if subTable == nil {
 		return nil
 	}
@@ -673,5 +944,49 @@ func LookupTableOpContainerViewWriterGivesError(table OpTableContainer, name str
 	}
 	return tab[name]
 }
-// No Defaults
+
+// OpContainerLookupGeneric is a generic lookup function which just looks things up by
+// name, using code-generation and a naming convention.
+func OpContainerLookupGeneric(target ReadOnlyContainer, typ OpType, name string) OpFunctionContainer {
+	switch typ {
+	case OpTypeView:
+		return OpLookupGenericContainerView(target, name)
+	case OpTypeViewGivesBool:
+		return OpLookupGenericContainerViewGivesBool(target, name)
+	case OpTypeViewGivesBit:
+		return OpLookupGenericContainerViewGivesBit(target, name)
+	case OpTypeViewRangeGivesBool:
+		return OpLookupGenericContainerViewRangeGivesBool(target, name)
+	case OpTypeViewRangeGivesBit:
+		return OpLookupGenericContainerViewRangeGivesBit(target, name)
+	case OpTypeViewRangeGivesOther:
+		return OpLookupGenericContainerViewRangeGivesContainer(target, name)
+	case OpTypeViewRangeGivesBitsBool:
+		return OpLookupGenericContainerViewRangeGivesBitsBool(target, name)
+	case OpTypeUpdate:
+		return OpLookupGenericContainerUpdate(target, name)
+	case OpTypeViewRange:
+		return OpLookupGenericContainerViewRange(target, name)
+	case OpTypeViewBit:
+		return OpLookupGenericContainerViewBit(target, name)
+	case OpTypeUpdateBit:
+		return OpLookupGenericContainerUpdateBit(target, name)
+	case OpTypeViewOther:
+		return OpLookupGenericContainerViewContainer(target, name)
+	case OpTypeUpdateOther:
+		return OpLookupGenericContainerUpdateContainer(target, name)
+	case OpTypeViewBits:
+		return OpLookupGenericContainerViewBits(target, name)
+	case OpTypeUpdateBits:
+		return OpLookupGenericContainerUpdateBits(target, name)
+	case OpTypeViewOthers:
+		return OpLookupGenericContainerViewContainers(target, name)
+	case OpTypeUpdateOthers:
+		return OpLookupGenericContainerUpdateContainers(target, name)
+	case OpTypeUpdateBytes:
+		return OpLookupGenericContainerUpdateBytes(target, name)
+	case OpTypeViewWriterGivesError:
+		return OpLookupGenericContainerViewWriterGivesError(target, name)
+	}
+	return nil
 }
