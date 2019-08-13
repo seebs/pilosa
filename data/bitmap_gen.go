@@ -23,6 +23,14 @@ type OpTableBitmapGeneric interface {
 	BitmapOpTypeTable() OpType
 }
 
+// BitmapHasOpLookup indicates that you need per-item operation
+// lookups. Implement this if, for instance, your implementation wraps
+// another implementation and you do forwarding for arbitrary methods in
+// some fancy way.
+type BitmapHasOpLookup interface {
+	OpLookup(OpType, string) OpFunctionBitmap
+}
+
 // OpTableBitmap is a slice mapping optypes to map[string]opFunc,
 // where any specific map will actually be a map with a concrete type of
 // op function. We defined the
@@ -43,14 +51,19 @@ func (OpTableBitmapView) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapView(target ReadOnlyBitmap, name string) OpBitmapView {
-	method := target.OpLookup(OpTypeView, name)
-	if method != nil {
-		return method.(OpBitmapView)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeView, name)
+		if method != nil {
+			return method.(OpBitmapView)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapView(target, name)
 }
 
-func OpLookupGenericBitmapView(target ReadOnlyBitmap, name string) OpBitmapView {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapView(target ReadOnlyBitmap, name string) OpBitmapView {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "View")
 	if method.IsValid() {
@@ -90,14 +103,19 @@ func (OpTableBitmapViewGivesBool) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewGivesBool {
-	method := target.OpLookup(OpTypeViewGivesBool, name)
-	if method != nil {
-		return method.(OpBitmapViewGivesBool)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewGivesBool, name)
+		if method != nil {
+			return method.(OpBitmapViewGivesBool)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewGivesBool(target, name)
 }
 
-func OpLookupGenericBitmapViewGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewGivesBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBool")
 	if method.IsValid() {
@@ -149,14 +167,19 @@ func (OpTableBitmapViewGivesBit) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewGivesBit {
-	method := target.OpLookup(OpTypeViewGivesBit, name)
-	if method != nil {
-		return method.(OpBitmapViewGivesBit)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewGivesBit, name)
+		if method != nil {
+			return method.(OpBitmapViewGivesBit)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewGivesBit(target, name)
 }
 
-func OpLookupGenericBitmapViewGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewGivesBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBit")
 	if method.IsValid() {
@@ -208,14 +231,19 @@ func (OpTableBitmapViewRangeGivesBool) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewRangeGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBool {
-	method := target.OpLookup(OpTypeViewRangeGivesBool, name)
-	if method != nil {
-		return method.(OpBitmapViewRangeGivesBool)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBool, name)
+		if method != nil {
+			return method.(OpBitmapViewRangeGivesBool)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewRangeGivesBool(target, name)
 }
 
-func OpLookupGenericBitmapViewRangeGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewRangeGivesBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBool")
 	if method.IsValid() {
@@ -267,14 +295,19 @@ func (OpTableBitmapViewRangeGivesBit) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewRangeGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBit {
-	method := target.OpLookup(OpTypeViewRangeGivesBit, name)
-	if method != nil {
-		return method.(OpBitmapViewRangeGivesBit)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBit, name)
+		if method != nil {
+			return method.(OpBitmapViewRangeGivesBit)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewRangeGivesBit(target, name)
 }
 
-func OpLookupGenericBitmapViewRangeGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewRangeGivesBit(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBit")
 	if method.IsValid() {
@@ -326,14 +359,19 @@ func (OpTableBitmapViewRangeGivesBitmap) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitmap {
-	method := target.OpLookup(OpTypeViewRangeGivesOther, name)
-	if method != nil {
-		return method.(OpBitmapViewRangeGivesBitmap)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesOther, name)
+		if method != nil {
+			return method.(OpBitmapViewRangeGivesBitmap)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewRangeGivesBitmap(target, name)
 }
 
-func OpLookupGenericBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitmap {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewRangeGivesBitmap(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitmap {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBitmap")
 	if method.IsValid() {
@@ -385,14 +423,19 @@ func (OpTableBitmapViewRangeGivesBitsBool) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewRangeGivesBitsBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitsBool {
-	method := target.OpLookup(OpTypeViewRangeGivesBitsBool, name)
-	if method != nil {
-		return method.(OpBitmapViewRangeGivesBitsBool)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBitsBool, name)
+		if method != nil {
+			return method.(OpBitmapViewRangeGivesBitsBool)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewRangeGivesBitsBool(target, name)
 }
 
-func OpLookupGenericBitmapViewRangeGivesBitsBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitsBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewRangeGivesBitsBool(target ReadOnlyBitmap, name string) OpBitmapViewRangeGivesBitsBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBitsBool")
 	if method.IsValid() {
@@ -444,14 +487,19 @@ func (OpTableBitmapUpdate) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdate(target ReadOnlyBitmap, name string) OpBitmapUpdate {
-	method := target.OpLookup(OpTypeUpdate, name)
-	if method != nil {
-		return method.(OpBitmapUpdate)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdate, name)
+		if method != nil {
+			return method.(OpBitmapUpdate)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdate(target, name)
 }
 
-func OpLookupGenericBitmapUpdate(target ReadOnlyBitmap, name string) OpBitmapUpdate {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdate(target ReadOnlyBitmap, name string) OpBitmapUpdate {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "Update")
 	if method.IsValid() {
@@ -491,14 +539,19 @@ func (OpTableBitmapViewRange) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewRange(target ReadOnlyBitmap, name string) OpBitmapViewRange {
-	method := target.OpLookup(OpTypeViewRange, name)
-	if method != nil {
-		return method.(OpBitmapViewRange)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRange, name)
+		if method != nil {
+			return method.(OpBitmapViewRange)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewRange(target, name)
 }
 
-func OpLookupGenericBitmapViewRange(target ReadOnlyBitmap, name string) OpBitmapViewRange {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewRange(target ReadOnlyBitmap, name string) OpBitmapViewRange {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRange")
 	if method.IsValid() {
@@ -538,14 +591,19 @@ func (OpTableBitmapViewBit) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewBit(target ReadOnlyBitmap, name string) OpBitmapViewBit {
-	method := target.OpLookup(OpTypeViewBit, name)
-	if method != nil {
-		return method.(OpBitmapViewBit)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewBit, name)
+		if method != nil {
+			return method.(OpBitmapViewBit)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewBit(target, name)
 }
 
-func OpLookupGenericBitmapViewBit(target ReadOnlyBitmap, name string) OpBitmapViewBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewBit(target ReadOnlyBitmap, name string) OpBitmapViewBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBit")
 	if method.IsValid() {
@@ -585,14 +643,19 @@ func (OpTableBitmapUpdateBit) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdateBit(target ReadOnlyBitmap, name string) OpBitmapUpdateBit {
-	method := target.OpLookup(OpTypeUpdateBit, name)
-	if method != nil {
-		return method.(OpBitmapUpdateBit)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBit, name)
+		if method != nil {
+			return method.(OpBitmapUpdateBit)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdateBit(target, name)
 }
 
-func OpLookupGenericBitmapUpdateBit(target ReadOnlyBitmap, name string) OpBitmapUpdateBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdateBit(target ReadOnlyBitmap, name string) OpBitmapUpdateBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBit")
 	if method.IsValid() {
@@ -656,14 +719,19 @@ func (OpTableBitmapViewBitmap) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewBitmap(target ReadOnlyBitmap, name string) OpBitmapViewBitmap {
-	method := target.OpLookup(OpTypeViewOther, name)
-	if method != nil {
-		return method.(OpBitmapViewBitmap)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewOther, name)
+		if method != nil {
+			return method.(OpBitmapViewBitmap)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewBitmap(target, name)
 }
 
-func OpLookupGenericBitmapViewBitmap(target ReadOnlyBitmap, name string) OpBitmapViewBitmap {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewBitmap(target ReadOnlyBitmap, name string) OpBitmapViewBitmap {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBitmap")
 	if method.IsValid() {
@@ -703,14 +771,19 @@ func (OpTableBitmapUpdateBitmap) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdateBitmap(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmap {
-	method := target.OpLookup(OpTypeUpdateOther, name)
-	if method != nil {
-		return method.(OpBitmapUpdateBitmap)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateOther, name)
+		if method != nil {
+			return method.(OpBitmapUpdateBitmap)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdateBitmap(target, name)
 }
 
-func OpLookupGenericBitmapUpdateBitmap(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmap {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdateBitmap(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmap {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBitmap")
 	if method.IsValid() {
@@ -750,14 +823,19 @@ func (OpTableBitmapViewBits) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewBits(target ReadOnlyBitmap, name string) OpBitmapViewBits {
-	method := target.OpLookup(OpTypeViewBits, name)
-	if method != nil {
-		return method.(OpBitmapViewBits)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewBits, name)
+		if method != nil {
+			return method.(OpBitmapViewBits)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewBits(target, name)
 }
 
-func OpLookupGenericBitmapViewBits(target ReadOnlyBitmap, name string) OpBitmapViewBits {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewBits(target ReadOnlyBitmap, name string) OpBitmapViewBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBits")
 	if method.IsValid() {
@@ -797,14 +875,19 @@ func (OpTableBitmapUpdateBits) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdateBits(target ReadOnlyBitmap, name string) OpBitmapUpdateBits {
-	method := target.OpLookup(OpTypeUpdateBits, name)
-	if method != nil {
-		return method.(OpBitmapUpdateBits)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBits, name)
+		if method != nil {
+			return method.(OpBitmapUpdateBits)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdateBits(target, name)
 }
 
-func OpLookupGenericBitmapUpdateBits(target ReadOnlyBitmap, name string) OpBitmapUpdateBits {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdateBits(target ReadOnlyBitmap, name string) OpBitmapUpdateBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBits")
 	if method.IsValid() {
@@ -844,14 +927,19 @@ func (OpTableBitmapViewBitmaps) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewBitmaps(target ReadOnlyBitmap, name string) OpBitmapViewBitmaps {
-	method := target.OpLookup(OpTypeViewOthers, name)
-	if method != nil {
-		return method.(OpBitmapViewBitmaps)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewOthers, name)
+		if method != nil {
+			return method.(OpBitmapViewBitmaps)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewBitmaps(target, name)
 }
 
-func OpLookupGenericBitmapViewBitmaps(target ReadOnlyBitmap, name string) OpBitmapViewBitmaps {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewBitmaps(target ReadOnlyBitmap, name string) OpBitmapViewBitmaps {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBitmaps")
 	if method.IsValid() {
@@ -891,14 +979,19 @@ func (OpTableBitmapUpdateBitmaps) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdateBitmaps(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmaps {
-	method := target.OpLookup(OpTypeUpdateOthers, name)
-	if method != nil {
-		return method.(OpBitmapUpdateBitmaps)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateOthers, name)
+		if method != nil {
+			return method.(OpBitmapUpdateBitmaps)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdateBitmaps(target, name)
 }
 
-func OpLookupGenericBitmapUpdateBitmaps(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmaps {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdateBitmaps(target ReadOnlyBitmap, name string) OpBitmapUpdateBitmaps {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBitmaps")
 	if method.IsValid() {
@@ -938,14 +1031,19 @@ func (OpTableBitmapUpdateBytes) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapUpdateBytes(target ReadOnlyBitmap, name string) OpBitmapUpdateBytes {
-	method := target.OpLookup(OpTypeUpdateBytes, name)
-	if method != nil {
-		return method.(OpBitmapUpdateBytes)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBytes, name)
+		if method != nil {
+			return method.(OpBitmapUpdateBytes)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapUpdateBytes(target, name)
 }
 
-func OpLookupGenericBitmapUpdateBytes(target ReadOnlyBitmap, name string) OpBitmapUpdateBytes {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapUpdateBytes(target ReadOnlyBitmap, name string) OpBitmapUpdateBytes {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBytes")
 	if method.IsValid() {
@@ -997,14 +1095,19 @@ func (OpTableBitmapViewWriterGivesError) BitmapOpTypeTable() OpType {
 }
 
 func OpLookupBitmapViewWriterGivesError(target ReadOnlyBitmap, name string) OpBitmapViewWriterGivesError {
-	method := target.OpLookup(OpTypeViewWriterGivesError, name)
-	if method != nil {
-		return method.(OpBitmapViewWriterGivesError)
+	if target, ok := target.((BitmapHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewWriterGivesError, name)
+		if method != nil {
+			return method.(OpBitmapViewWriterGivesError)
+		}
 	}
-	return nil
+	return OpLookupDirectBitmapViewWriterGivesError(target, name)
 }
 
-func OpLookupGenericBitmapViewWriterGivesError(target ReadOnlyBitmap, name string) OpBitmapViewWriterGivesError {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectBitmapViewWriterGivesError(target ReadOnlyBitmap, name string) OpBitmapViewWriterGivesError {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewWriterGivesError")
 	if method.IsValid() {
@@ -1041,48 +1144,95 @@ func ExportRoaring(target ReadOnlyBitmap, in1 io.Writer) error {
 	return genericExportRoaring(target, in1)
 }
 
-// OpBitmapLookupGeneric is a generic lookup function which just looks things up by
-// name, using code-generation and a naming convention.
+// OpBitmapLookupGeneric is a generic lookup function which will
+// use any provided OpLookup functionality of its target, falling back on
+// the default name-based lookup.
 func OpBitmapLookupGeneric(target ReadOnlyBitmap, typ OpType, name string) OpFunctionBitmap {
 	switch typ {
 	case OpTypeView:
-		return OpLookupGenericBitmapView(target, name)
+		return OpLookupBitmapView(target, name)
 	case OpTypeViewGivesBool:
-		return OpLookupGenericBitmapViewGivesBool(target, name)
+		return OpLookupBitmapViewGivesBool(target, name)
 	case OpTypeViewGivesBit:
-		return OpLookupGenericBitmapViewGivesBit(target, name)
+		return OpLookupBitmapViewGivesBit(target, name)
 	case OpTypeViewRangeGivesBool:
-		return OpLookupGenericBitmapViewRangeGivesBool(target, name)
+		return OpLookupBitmapViewRangeGivesBool(target, name)
 	case OpTypeViewRangeGivesBit:
-		return OpLookupGenericBitmapViewRangeGivesBit(target, name)
+		return OpLookupBitmapViewRangeGivesBit(target, name)
 	case OpTypeViewRangeGivesOther:
-		return OpLookupGenericBitmapViewRangeGivesBitmap(target, name)
+		return OpLookupBitmapViewRangeGivesBitmap(target, name)
 	case OpTypeViewRangeGivesBitsBool:
-		return OpLookupGenericBitmapViewRangeGivesBitsBool(target, name)
+		return OpLookupBitmapViewRangeGivesBitsBool(target, name)
 	case OpTypeUpdate:
-		return OpLookupGenericBitmapUpdate(target, name)
+		return OpLookupBitmapUpdate(target, name)
 	case OpTypeViewRange:
-		return OpLookupGenericBitmapViewRange(target, name)
+		return OpLookupBitmapViewRange(target, name)
 	case OpTypeViewBit:
-		return OpLookupGenericBitmapViewBit(target, name)
+		return OpLookupBitmapViewBit(target, name)
 	case OpTypeUpdateBit:
-		return OpLookupGenericBitmapUpdateBit(target, name)
+		return OpLookupBitmapUpdateBit(target, name)
 	case OpTypeViewOther:
-		return OpLookupGenericBitmapViewBitmap(target, name)
+		return OpLookupBitmapViewBitmap(target, name)
 	case OpTypeUpdateOther:
-		return OpLookupGenericBitmapUpdateBitmap(target, name)
+		return OpLookupBitmapUpdateBitmap(target, name)
 	case OpTypeViewBits:
-		return OpLookupGenericBitmapViewBits(target, name)
+		return OpLookupBitmapViewBits(target, name)
 	case OpTypeUpdateBits:
-		return OpLookupGenericBitmapUpdateBits(target, name)
+		return OpLookupBitmapUpdateBits(target, name)
 	case OpTypeViewOthers:
-		return OpLookupGenericBitmapViewBitmaps(target, name)
+		return OpLookupBitmapViewBitmaps(target, name)
 	case OpTypeUpdateOthers:
-		return OpLookupGenericBitmapUpdateBitmaps(target, name)
+		return OpLookupBitmapUpdateBitmaps(target, name)
 	case OpTypeUpdateBytes:
-		return OpLookupGenericBitmapUpdateBytes(target, name)
+		return OpLookupBitmapUpdateBytes(target, name)
 	case OpTypeViewWriterGivesError:
-		return OpLookupGenericBitmapViewWriterGivesError(target, name)
+		return OpLookupBitmapViewWriterGivesError(target, name)
+	}
+	return nil
+}
+
+// OpBitmapLookupGenericDirect is a generic lookup function which ignores
+// any OpLookup functionality of the target and just does the reflect stuff.
+func OpBitmapLookupGenericDirect(target ReadOnlyBitmap, typ OpType, name string) OpFunctionBitmap {
+	switch typ {
+	case OpTypeView:
+		return OpLookupDirectBitmapView(target, name)
+	case OpTypeViewGivesBool:
+		return OpLookupDirectBitmapViewGivesBool(target, name)
+	case OpTypeViewGivesBit:
+		return OpLookupDirectBitmapViewGivesBit(target, name)
+	case OpTypeViewRangeGivesBool:
+		return OpLookupDirectBitmapViewRangeGivesBool(target, name)
+	case OpTypeViewRangeGivesBit:
+		return OpLookupDirectBitmapViewRangeGivesBit(target, name)
+	case OpTypeViewRangeGivesOther:
+		return OpLookupDirectBitmapViewRangeGivesBitmap(target, name)
+	case OpTypeViewRangeGivesBitsBool:
+		return OpLookupDirectBitmapViewRangeGivesBitsBool(target, name)
+	case OpTypeUpdate:
+		return OpLookupDirectBitmapUpdate(target, name)
+	case OpTypeViewRange:
+		return OpLookupDirectBitmapViewRange(target, name)
+	case OpTypeViewBit:
+		return OpLookupDirectBitmapViewBit(target, name)
+	case OpTypeUpdateBit:
+		return OpLookupDirectBitmapUpdateBit(target, name)
+	case OpTypeViewOther:
+		return OpLookupDirectBitmapViewBitmap(target, name)
+	case OpTypeUpdateOther:
+		return OpLookupDirectBitmapUpdateBitmap(target, name)
+	case OpTypeViewBits:
+		return OpLookupDirectBitmapViewBits(target, name)
+	case OpTypeUpdateBits:
+		return OpLookupDirectBitmapUpdateBits(target, name)
+	case OpTypeViewOthers:
+		return OpLookupDirectBitmapViewBitmaps(target, name)
+	case OpTypeUpdateOthers:
+		return OpLookupDirectBitmapUpdateBitmaps(target, name)
+	case OpTypeUpdateBytes:
+		return OpLookupDirectBitmapUpdateBytes(target, name)
+	case OpTypeViewWriterGivesError:
+		return OpLookupDirectBitmapViewWriterGivesError(target, name)
 	}
 	return nil
 }

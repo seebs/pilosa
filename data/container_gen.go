@@ -23,6 +23,14 @@ type OpTableContainerGeneric interface {
 	ContainerOpTypeTable() OpType
 }
 
+// ContainerHasOpLookup indicates that you need per-item operation
+// lookups. Implement this if, for instance, your implementation wraps
+// another implementation and you do forwarding for arbitrary methods in
+// some fancy way.
+type ContainerHasOpLookup interface {
+	OpLookup(OpType, string) OpFunctionContainer
+}
+
 // OpTableContainer is a slice mapping optypes to map[string]opFunc,
 // where any specific map will actually be a map with a concrete type of
 // op function. We defined the
@@ -43,14 +51,19 @@ func (OpTableContainerView) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerView(target ReadOnlyContainer, name string) OpContainerView {
-	method := target.OpLookup(OpTypeView, name)
-	if method != nil {
-		return method.(OpContainerView)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeView, name)
+		if method != nil {
+			return method.(OpContainerView)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerView(target, name)
 }
 
-func OpLookupGenericContainerView(target ReadOnlyContainer, name string) OpContainerView {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerView(target ReadOnlyContainer, name string) OpContainerView {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "View")
 	if method.IsValid() {
@@ -90,14 +103,19 @@ func (OpTableContainerViewGivesBool) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
-	method := target.OpLookup(OpTypeViewGivesBool, name)
-	if method != nil {
-		return method.(OpContainerViewGivesBool)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewGivesBool, name)
+		if method != nil {
+			return method.(OpContainerViewGivesBool)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewGivesBool(target, name)
 }
 
-func OpLookupGenericContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewGivesBool(target ReadOnlyContainer, name string) OpContainerViewGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBool")
 	if method.IsValid() {
@@ -149,14 +167,19 @@ func (OpTableContainerViewGivesBit) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
-	method := target.OpLookup(OpTypeViewGivesBit, name)
-	if method != nil {
-		return method.(OpContainerViewGivesBit)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewGivesBit, name)
+		if method != nil {
+			return method.(OpContainerViewGivesBit)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewGivesBit(target, name)
 }
 
-func OpLookupGenericContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewGivesBit(target ReadOnlyContainer, name string) OpContainerViewGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewGivesBit")
 	if method.IsValid() {
@@ -208,14 +231,19 @@ func (OpTableContainerViewRangeGivesBool) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
-	method := target.OpLookup(OpTypeViewRangeGivesBool, name)
-	if method != nil {
-		return method.(OpContainerViewRangeGivesBool)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBool, name)
+		if method != nil {
+			return method.(OpContainerViewRangeGivesBool)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewRangeGivesBool(target, name)
 }
 
-func OpLookupGenericContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewRangeGivesBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBool")
 	if method.IsValid() {
@@ -255,14 +283,19 @@ func (OpTableContainerViewRangeGivesBit) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
-	method := target.OpLookup(OpTypeViewRangeGivesBit, name)
-	if method != nil {
-		return method.(OpContainerViewRangeGivesBit)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBit, name)
+		if method != nil {
+			return method.(OpContainerViewRangeGivesBit)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewRangeGivesBit(target, name)
 }
 
-func OpLookupGenericContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewRangeGivesBit(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBit")
 	if method.IsValid() {
@@ -302,14 +335,19 @@ func (OpTableContainerViewRangeGivesContainer) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
-	method := target.OpLookup(OpTypeViewRangeGivesOther, name)
-	if method != nil {
-		return method.(OpContainerViewRangeGivesContainer)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesOther, name)
+		if method != nil {
+			return method.(OpContainerViewRangeGivesContainer)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewRangeGivesContainer(target, name)
 }
 
-func OpLookupGenericContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewRangeGivesContainer(target ReadOnlyContainer, name string) OpContainerViewRangeGivesContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesContainer")
 	if method.IsValid() {
@@ -349,14 +387,19 @@ func (OpTableContainerViewRangeGivesBitsBool) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
-	method := target.OpLookup(OpTypeViewRangeGivesBitsBool, name)
-	if method != nil {
-		return method.(OpContainerViewRangeGivesBitsBool)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRangeGivesBitsBool, name)
+		if method != nil {
+			return method.(OpContainerViewRangeGivesBitsBool)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewRangeGivesBitsBool(target, name)
 }
 
-func OpLookupGenericContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewRangeGivesBitsBool(target ReadOnlyContainer, name string) OpContainerViewRangeGivesBitsBool {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRangeGivesBitsBool")
 	if method.IsValid() {
@@ -396,14 +439,19 @@ func (OpTableContainerUpdate) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
-	method := target.OpLookup(OpTypeUpdate, name)
-	if method != nil {
-		return method.(OpContainerUpdate)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdate, name)
+		if method != nil {
+			return method.(OpContainerUpdate)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdate(target, name)
 }
 
-func OpLookupGenericContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdate(target ReadOnlyContainer, name string) OpContainerUpdate {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "Update")
 	if method.IsValid() {
@@ -443,14 +491,19 @@ func (OpTableContainerViewRange) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
-	method := target.OpLookup(OpTypeViewRange, name)
-	if method != nil {
-		return method.(OpContainerViewRange)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewRange, name)
+		if method != nil {
+			return method.(OpContainerViewRange)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewRange(target, name)
 }
 
-func OpLookupGenericContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewRange(target ReadOnlyContainer, name string) OpContainerViewRange {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewRange")
 	if method.IsValid() {
@@ -490,14 +543,19 @@ func (OpTableContainerViewBit) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
-	method := target.OpLookup(OpTypeViewBit, name)
-	if method != nil {
-		return method.(OpContainerViewBit)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewBit, name)
+		if method != nil {
+			return method.(OpContainerViewBit)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewBit(target, name)
 }
 
-func OpLookupGenericContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewBit(target ReadOnlyContainer, name string) OpContainerViewBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBit")
 	if method.IsValid() {
@@ -537,14 +595,19 @@ func (OpTableContainerUpdateBit) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
-	method := target.OpLookup(OpTypeUpdateBit, name)
-	if method != nil {
-		return method.(OpContainerUpdateBit)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBit, name)
+		if method != nil {
+			return method.(OpContainerUpdateBit)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdateBit(target, name)
 }
 
-func OpLookupGenericContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdateBit(target ReadOnlyContainer, name string) OpContainerUpdateBit {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBit")
 	if method.IsValid() {
@@ -584,14 +647,19 @@ func (OpTableContainerViewContainer) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
-	method := target.OpLookup(OpTypeViewOther, name)
-	if method != nil {
-		return method.(OpContainerViewContainer)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewOther, name)
+		if method != nil {
+			return method.(OpContainerViewContainer)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewContainer(target, name)
 }
 
-func OpLookupGenericContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewContainer(target ReadOnlyContainer, name string) OpContainerViewContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainer")
 	if method.IsValid() {
@@ -631,14 +699,19 @@ func (OpTableContainerUpdateContainer) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
-	method := target.OpLookup(OpTypeUpdateOther, name)
-	if method != nil {
-		return method.(OpContainerUpdateContainer)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateOther, name)
+		if method != nil {
+			return method.(OpContainerUpdateContainer)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdateContainer(target, name)
 }
 
-func OpLookupGenericContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdateContainer(target ReadOnlyContainer, name string) OpContainerUpdateContainer {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainer")
 	if method.IsValid() {
@@ -678,14 +751,19 @@ func (OpTableContainerViewBits) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
-	method := target.OpLookup(OpTypeViewBits, name)
-	if method != nil {
-		return method.(OpContainerViewBits)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewBits, name)
+		if method != nil {
+			return method.(OpContainerViewBits)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewBits(target, name)
 }
 
-func OpLookupGenericContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewBits(target ReadOnlyContainer, name string) OpContainerViewBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewBits")
 	if method.IsValid() {
@@ -725,14 +803,19 @@ func (OpTableContainerUpdateBits) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
-	method := target.OpLookup(OpTypeUpdateBits, name)
-	if method != nil {
-		return method.(OpContainerUpdateBits)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBits, name)
+		if method != nil {
+			return method.(OpContainerUpdateBits)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdateBits(target, name)
 }
 
-func OpLookupGenericContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdateBits(target ReadOnlyContainer, name string) OpContainerUpdateBits {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBits")
 	if method.IsValid() {
@@ -772,14 +855,19 @@ func (OpTableContainerViewContainers) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
-	method := target.OpLookup(OpTypeViewOthers, name)
-	if method != nil {
-		return method.(OpContainerViewContainers)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewOthers, name)
+		if method != nil {
+			return method.(OpContainerViewContainers)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewContainers(target, name)
 }
 
-func OpLookupGenericContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewContainers(target ReadOnlyContainer, name string) OpContainerViewContainers {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewContainers")
 	if method.IsValid() {
@@ -819,14 +907,19 @@ func (OpTableContainerUpdateContainers) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
-	method := target.OpLookup(OpTypeUpdateOthers, name)
-	if method != nil {
-		return method.(OpContainerUpdateContainers)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateOthers, name)
+		if method != nil {
+			return method.(OpContainerUpdateContainers)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdateContainers(target, name)
 }
 
-func OpLookupGenericContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdateContainers(target ReadOnlyContainer, name string) OpContainerUpdateContainers {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateContainers")
 	if method.IsValid() {
@@ -866,14 +959,19 @@ func (OpTableContainerUpdateBytes) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
-	method := target.OpLookup(OpTypeUpdateBytes, name)
-	if method != nil {
-		return method.(OpContainerUpdateBytes)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeUpdateBytes, name)
+		if method != nil {
+			return method.(OpContainerUpdateBytes)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerUpdateBytes(target, name)
 }
 
-func OpLookupGenericContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerUpdateBytes(target ReadOnlyContainer, name string) OpContainerUpdateBytes {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "UpdateBytes")
 	if method.IsValid() {
@@ -913,14 +1011,19 @@ func (OpTableContainerViewWriterGivesError) ContainerOpTypeTable() OpType {
 }
 
 func OpLookupContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
-	method := target.OpLookup(OpTypeViewWriterGivesError, name)
-	if method != nil {
-		return method.(OpContainerViewWriterGivesError)
+	if target, ok := target.((ContainerHasOpLookup)); ok {
+		method := target.OpLookup(OpTypeViewWriterGivesError, name)
+		if method != nil {
+			return method.(OpContainerViewWriterGivesError)
+		}
 	}
-	return nil
+	return OpLookupDirectContainerViewWriterGivesError(target, name)
 }
 
-func OpLookupGenericContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirectContainerViewWriterGivesError(target ReadOnlyContainer, name string) OpContainerViewWriterGivesError {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "ViewWriterGivesError")
 	if method.IsValid() {
@@ -945,48 +1048,95 @@ func LookupTableOpContainerViewWriterGivesError(table OpTableContainer, name str
 	return tab[name]
 }
 
-// OpContainerLookupGeneric is a generic lookup function which just looks things up by
-// name, using code-generation and a naming convention.
+// OpContainerLookupGeneric is a generic lookup function which will
+// use any provided OpLookup functionality of its target, falling back on
+// the default name-based lookup.
 func OpContainerLookupGeneric(target ReadOnlyContainer, typ OpType, name string) OpFunctionContainer {
 	switch typ {
 	case OpTypeView:
-		return OpLookupGenericContainerView(target, name)
+		return OpLookupContainerView(target, name)
 	case OpTypeViewGivesBool:
-		return OpLookupGenericContainerViewGivesBool(target, name)
+		return OpLookupContainerViewGivesBool(target, name)
 	case OpTypeViewGivesBit:
-		return OpLookupGenericContainerViewGivesBit(target, name)
+		return OpLookupContainerViewGivesBit(target, name)
 	case OpTypeViewRangeGivesBool:
-		return OpLookupGenericContainerViewRangeGivesBool(target, name)
+		return OpLookupContainerViewRangeGivesBool(target, name)
 	case OpTypeViewRangeGivesBit:
-		return OpLookupGenericContainerViewRangeGivesBit(target, name)
+		return OpLookupContainerViewRangeGivesBit(target, name)
 	case OpTypeViewRangeGivesOther:
-		return OpLookupGenericContainerViewRangeGivesContainer(target, name)
+		return OpLookupContainerViewRangeGivesContainer(target, name)
 	case OpTypeViewRangeGivesBitsBool:
-		return OpLookupGenericContainerViewRangeGivesBitsBool(target, name)
+		return OpLookupContainerViewRangeGivesBitsBool(target, name)
 	case OpTypeUpdate:
-		return OpLookupGenericContainerUpdate(target, name)
+		return OpLookupContainerUpdate(target, name)
 	case OpTypeViewRange:
-		return OpLookupGenericContainerViewRange(target, name)
+		return OpLookupContainerViewRange(target, name)
 	case OpTypeViewBit:
-		return OpLookupGenericContainerViewBit(target, name)
+		return OpLookupContainerViewBit(target, name)
 	case OpTypeUpdateBit:
-		return OpLookupGenericContainerUpdateBit(target, name)
+		return OpLookupContainerUpdateBit(target, name)
 	case OpTypeViewOther:
-		return OpLookupGenericContainerViewContainer(target, name)
+		return OpLookupContainerViewContainer(target, name)
 	case OpTypeUpdateOther:
-		return OpLookupGenericContainerUpdateContainer(target, name)
+		return OpLookupContainerUpdateContainer(target, name)
 	case OpTypeViewBits:
-		return OpLookupGenericContainerViewBits(target, name)
+		return OpLookupContainerViewBits(target, name)
 	case OpTypeUpdateBits:
-		return OpLookupGenericContainerUpdateBits(target, name)
+		return OpLookupContainerUpdateBits(target, name)
 	case OpTypeViewOthers:
-		return OpLookupGenericContainerViewContainers(target, name)
+		return OpLookupContainerViewContainers(target, name)
 	case OpTypeUpdateOthers:
-		return OpLookupGenericContainerUpdateContainers(target, name)
+		return OpLookupContainerUpdateContainers(target, name)
 	case OpTypeUpdateBytes:
-		return OpLookupGenericContainerUpdateBytes(target, name)
+		return OpLookupContainerUpdateBytes(target, name)
 	case OpTypeViewWriterGivesError:
-		return OpLookupGenericContainerViewWriterGivesError(target, name)
+		return OpLookupContainerViewWriterGivesError(target, name)
+	}
+	return nil
+}
+
+// OpContainerLookupGenericDirect is a generic lookup function which ignores
+// any OpLookup functionality of the target and just does the reflect stuff.
+func OpContainerLookupGenericDirect(target ReadOnlyContainer, typ OpType, name string) OpFunctionContainer {
+	switch typ {
+	case OpTypeView:
+		return OpLookupDirectContainerView(target, name)
+	case OpTypeViewGivesBool:
+		return OpLookupDirectContainerViewGivesBool(target, name)
+	case OpTypeViewGivesBit:
+		return OpLookupDirectContainerViewGivesBit(target, name)
+	case OpTypeViewRangeGivesBool:
+		return OpLookupDirectContainerViewRangeGivesBool(target, name)
+	case OpTypeViewRangeGivesBit:
+		return OpLookupDirectContainerViewRangeGivesBit(target, name)
+	case OpTypeViewRangeGivesOther:
+		return OpLookupDirectContainerViewRangeGivesContainer(target, name)
+	case OpTypeViewRangeGivesBitsBool:
+		return OpLookupDirectContainerViewRangeGivesBitsBool(target, name)
+	case OpTypeUpdate:
+		return OpLookupDirectContainerUpdate(target, name)
+	case OpTypeViewRange:
+		return OpLookupDirectContainerViewRange(target, name)
+	case OpTypeViewBit:
+		return OpLookupDirectContainerViewBit(target, name)
+	case OpTypeUpdateBit:
+		return OpLookupDirectContainerUpdateBit(target, name)
+	case OpTypeViewOther:
+		return OpLookupDirectContainerViewContainer(target, name)
+	case OpTypeUpdateOther:
+		return OpLookupDirectContainerUpdateContainer(target, name)
+	case OpTypeViewBits:
+		return OpLookupDirectContainerViewBits(target, name)
+	case OpTypeUpdateBits:
+		return OpLookupDirectContainerUpdateBits(target, name)
+	case OpTypeViewOthers:
+		return OpLookupDirectContainerViewContainers(target, name)
+	case OpTypeUpdateOthers:
+		return OpLookupDirectContainerUpdateContainers(target, name)
+	case OpTypeUpdateBytes:
+		return OpLookupDirectContainerUpdateBytes(target, name)
+	case OpTypeViewWriterGivesError:
+		return OpLookupDirectContainerViewWriterGivesError(target, name)
 	}
 	return nil
 }

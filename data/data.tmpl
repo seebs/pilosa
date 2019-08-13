@@ -23,6 +23,14 @@ type OpTable{{.Data.Name}}Generic interface {
 	{{.Data.Name}}OpTypeTable() OpType
 }
 
+// {{.Data.Name}}HasOpLookup indicates that you need per-item operation
+// lookups. Implement this if, for instance, your implementation wraps
+// another implementation and you do forwarding for arbitrary methods in
+// some fancy way.
+type {{$.Data.Name}}HasOpLookup interface {
+	OpLookup(OpType, string) OpFunction{{.Data.Name}}
+}
+
 // OpTable{{.Data.Name}} is a slice mapping optypes to map[string]opFunc,
 // where any specific map will actually be a map with a concrete type of
 // op function. We defined the
@@ -43,14 +51,19 @@ func (OpTable{{.OpName}}) {{$.Data.Name}}OpTypeTable() OpType {
 }
 
 func OpLookup{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
-	method := target.OpLookup({{.Op.Full}}, name)
-	if method != nil {
-		return method.(Op{{.OpName}})
+	if target, ok := target.(({{$.Data.Name}}HasOpLookup)); ok {
+		method := target.OpLookup({{.Op.Full}}, name)
+		if method != nil {
+			return method.(Op{{.OpName}})
+		}
 	}
-	return nil
+	return OpLookupDirect{{.OpName}}(target, name)
 }
 
-func OpLookupGeneric{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
+// OpLookupDirect disregards any OpLookup method. It's there to be used in
+// cases where you don't want to risk recursive lookups because you're
+// already in a lookup of some kind.
+func OpLookupDirect{{.OpName}}(target ReadOnly{{$.Data.Name}}, name string) Op{{.OpName}} {
 	val := reflect.ValueOf(target)
 	method := val.MethodByName(name + "{{.OpFuncSuffix}}")
 	if method.IsValid() {
@@ -89,13 +102,26 @@ func {{.Prefix}}{{.Name}}(target {{$parent.ReadOnly}}{{$.Data.Name}}{{$parent.Ar
 }
 {{- end}}
 {{end}}
-// Op{{$.Data.Name}}LookupGeneric is a generic lookup function which just looks things up by
-// name, using code-generation and a naming convention.
+// Op{{$.Data.Name}}LookupGeneric is a generic lookup function which will
+// use any provided OpLookup functionality of its target, falling back on
+// the default name-based lookup.
 func Op{{$.Data.Name}}LookupGeneric(target ReadOnly{{$.Data.Name}}, typ OpType, name string) OpFunction{{.Data.Name}} {
 	switch typ {
 {{- range .Ops}}
 	case {{.Op.Full}}:
-		return OpLookupGeneric{{.OpName}}(target, name)
+		return OpLookup{{.OpName}}(target, name)
+{{- end}}
+	}
+	return nil
+}
+
+// Op{{$.Data.Name}}LookupGenericDirect is a generic lookup function which ignores
+// any OpLookup functionality of the target and just does the reflect stuff.
+func Op{{$.Data.Name}}LookupGenericDirect(target ReadOnly{{$.Data.Name}}, typ OpType, name string) OpFunction{{.Data.Name}} {
+	switch typ {
+{{- range .Ops}}
+	case {{.Op.Full}}:
+		return OpLookupDirect{{.OpName}}(target, name)
 {{- end}}
 	}
 	return nil
