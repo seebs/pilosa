@@ -17,16 +17,6 @@ type ReadOnlyBitmap interface {
 	// key not less than first, and stops with the last container with
 	// a key not greater than last.
 	ViewContainersRange(first, last uint64, fn func(key uint64, c Container) (done bool, err error)) error
-	// OpLookup is the core function that is used to discover specialized
-	// implementations. It returns nil for a nonexistent {typ,name} pair.
-	// Usually, you wouldn't use this; you'd use specific functions like
-	// `LookupOpBitmapView(bitmap, name)` which wrap this, and return
-	// functions of a specific type. You would also usually not really
-	// write your own implementation of this; you'd use a premade standard
-	// one which caches lookup results by type. However, special cases,
-	// like a Bitmap implementation which wraps another Bitmap, might
-	// need to do per-object lookups.
-	OpLookup(typ OpType, name string) OpFunctionBitmap
 }
 
 // WriteOnlyBitmap is an interface which lets us describe the composition of
