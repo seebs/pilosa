@@ -58,20 +58,29 @@ func (iot *ioTypes) Any() bool {
 	return len(iot.Names) > 0
 }
 
-// NamedArgs gives "in1 type1, in2 type2, ..." for the arg list.
-func (iot *ioTypes) NamedArgs() string {
+// NamedArgs gives "prefix1 type1, prefix2 type2, ..." for a non-ReadOnly list.
+func (iot *ioTypes) NamedArgs(prefix string) string {
 	args := make([]string, len(iot.TypeNames))
 	for i := range iot.TypeNames {
-		args[i] = fmt.Sprintf("in%d %s", i+1, iot.ReadOnlyTypeNames[i])
+		args[i] = fmt.Sprintf("%s%d %s", prefix, i+1, iot.TypeNames[i])
+	}
+	return strings.Join(args, ", ")
+}
+
+// ReadOnlyNamedArgs gives "prefix1 type1, prefix2 type2, ..." for the arg list.
+func (iot *ioTypes) ReadOnlyNamedArgs(prefix string) string {
+	args := make([]string, len(iot.TypeNames))
+	for i := range iot.TypeNames {
+		args[i] = fmt.Sprintf("%s%d %s", prefix, i+1, iot.ReadOnlyTypeNames[i])
 	}
 	return strings.Join(args, ", ")
 }
 
 // ArgNames gives the Names used by NamedArgs.
-func (iot *ioTypes) ArgNames() string {
+func (iot *ioTypes) ArgNames(prefix string) string {
 	args := make([]string, len(iot.TypeNames))
 	for i := range iot.TypeNames {
-		args[i] = fmt.Sprintf("in%d", i+1)
+		args[i] = fmt.Sprintf("%s%d", prefix, i+1)
 	}
 	return strings.Join(args, ", ")
 }
@@ -248,6 +257,8 @@ type interpolatedOp struct {
 	ArgNames string
 	ArgList  string
 	ArgComma string
+	ResList  string
+	ResNames string
 }
 
 func writeData(dt dataType, opDatas []opData, tmpl *template.Template) error {
@@ -283,8 +294,22 @@ func writeData(dt dataType, opDatas []opData, tmpl *template.Template) error {
 		if op.ViewUpdate == "View" {
 			resTypes = interp.Results.ReadOnlyTypes()
 			interp.ReadOnly = "ReadOnly"
+			if interp.Results.Any() {
+				interp.ResList = interp.Results.ReadOnlyNamedArgs("out")
+				if interp.ResList != "" {
+					interp.ResList = " (" + interp.ResList + ")"
+				}
+				interp.ResNames = interp.Results.ArgNames("out")
+			}
 		} else {
 			resTypes = interp.Results.Types()
+			if interp.Results.Any() {
+				interp.ResList = interp.Results.NamedArgs("out")
+				if interp.ResList != "" {
+					interp.ResList = " (" + interp.ResList + ")"
+				}
+				interp.ResNames = interp.Results.ArgNames("out")
+			}
 		}
 		// guard the result types with () if they're plural
 		if strings.Contains(resTypes, ",") {
@@ -298,13 +323,14 @@ func writeData(dt dataType, opDatas []opData, tmpl *template.Template) error {
 		interp.LiteralFuncType = fmt.Sprintf("func(%s)%s", interp.Operands.ReadOnlyTypes(), interp.ResTypes)
 
 		defaults := op.TypedDefaultOps[dt.Name]
+		if interp.Operands.Any() {
+			interp.TypeList = interp.Operands.ReadOnlyTypes()
+			interp.ArgList = interp.Operands.ReadOnlyNamedArgs("in")
+			interp.ArgNames = interp.Operands.ArgNames("in")
+			interp.ArgComma = ", "
+		}
+
 		if len(defaults) > 0 {
-			if interp.Operands.Any() {
-				interp.TypeList = interp.Operands.ReadOnlyTypes()
-				interp.ArgList = interp.Operands.NamedArgs()
-				interp.ArgNames = interp.Operands.ArgNames()
-				interp.ArgComma = ", "
-			}
 			interp.Defaults = make([]prefixedName, len(defaults))
 			for i, name := range defaults {
 				if strings.HasPrefix(name, dt.Name) {
