@@ -213,7 +213,7 @@ func (b *Bitmap) unmarshalPilosaRoaring(data []byte) error {
 		b.opN += opr.count()
 		opsOffset += opr.size()
 		// Move the buffer forward.
-		buf = buf[opsOffset:]
+		buf = data[opsOffset:]
 	}
 
 	return nil
