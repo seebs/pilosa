@@ -2056,7 +2056,6 @@ func (f *fragment) importValueSmallWrite(columnIDs []uint64, values []int64, bit
 		}
 		return nil
 	}(); err != nil {
-		_ = f.closeStorage()
 		_ = f.openStorage(true)
 		return err
 	}
@@ -2097,7 +2096,6 @@ func (f *fragment) importValue(columnIDs []uint64, values []int64, bitDepth uint
 		}
 		return nil
 	}(); err != nil {
-		_ = f.closeStorage()
 		_ = f.openStorage(true)
 		return err
 	}
@@ -2225,17 +2223,24 @@ func unprotectedWriteToFragment(f *fragment, bm *roaring.Bitmap) (n int64, err e
 	if err != nil {
 		return n, fmt.Errorf("create snapshot file: %s", err)
 	}
-	defer file.Close()
+	// No deferred close, because we want to close it sooner than the
+	// end of this function.
 
 	// Write storage to snapshot.
 	bw := bufio.NewWriter(file)
 	if n, err = bm.WriteTo(bw); err != nil {
+		file.Close()
 		return n, fmt.Errorf("snapshot write to: %s", err)
 	}
 
 	if err := bw.Flush(); err != nil {
+		file.Close()
 		return n, fmt.Errorf("flush: %s", err)
 	}
+
+	// we close the file here so we don't still have it open when trying
+	// to open it in a moment.
+	file.Close()
 
 	// Move snapshot to data file location.
 	if err := os.Rename(snapshotPath, f.path); err != nil {
