@@ -19,6 +19,7 @@ package pilosa
 import (
 	"fmt"
 	"math/rand"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -60,6 +61,7 @@ func registerGeneration(id string) string {
 		}
 		id = origId + suffix
 	}
+	fmt.Printf("new generation %s\n", id)
 	knownGenerations[id] = newSpan
 	return id
 }
@@ -119,6 +121,7 @@ func finalizeGeneration(id string) {
 }
 
 func reportGenerations() []string {
+	runtime.GC()
 	knownGenerationLock.Lock()
 	defer knownGenerationLock.Unlock()
 	var surviving []string
