@@ -271,37 +271,56 @@ func (f *fragment) Open() error {
 	return nil
 }
 
+// emptyStorage is the common case for importStorage/applyStorage where they
+// get no data. It tries to write the current storage to the provided file,
+// which is assumed to be the file they didn't get any data from.
+func (f *fragment) emptyStorage(file *os.File) (bool, error) {
+	// No data. We'll mark this for no mapping, clear any existing
+	// mapped containers, and set the Source to nil. We also have no
+	// ops.
+	f.opN = 0
+	f.ops = 0
+	f.storage.SetOps(0, 0)
+
+	f.storage.PreferMapping(false)
+	_, err := f.storage.RemapRoaringStorage(nil)
+	f.storage.SetSource(nil)
+	if err != nil {
+		return false, fmt.Errorf("applying/importing storage: no data, and clearing old mapping also failed: %v", err)
+	}
+	// Write the existing storage out to the file so it's
+	// a valid Roaring file thereafter. nothing to unmarshal.
+	// In the unlikely event that this happened even though we
+	// had significant data, we're not mapping it, but that's
+	// harmless even if it's not maximally efficient.
+	bi := bufio.NewWriter(file)
+	if _, err = f.storage.WriteTo(bi); err != nil {
+		return false, fmt.Errorf("init storage file: %s", err)
+	}
+	bi.Flush()
+	return false, nil
+}
+
 // importStorage attempts to import data from storage -- for instance,
 // reading in a roaring bitmap from media.
 func (f *fragment) importStorage(data []byte, file *os.File, newGen generation, mapped bool) (bool, error) {
 	f.storage.PreferMapping(mapped)
-	f.storage.SetSource(newGen)
-	f.ops, f.opN = 0, 0
 	if len(data) == 0 {
-		// If there's no data, set this. It shouldn't matter but
-		// let's be consistent.
-		f.storage.PreferMapping(false)
-		// write the existing trivial storage out to the file so it's
-		// a valid Roaring file thereafter. nothing to unmarshal.
-		bi := bufio.NewWriter(file)
-		var err error
-		if _, err = f.storage.WriteTo(bi); err != nil {
-			return false, fmt.Errorf("init storage file: %s", err)
-		}
-		bi.Flush()
-		_, e2 := f.storage.RemapRoaringStorage(nil)
-		if e2 != nil {
-			return false, fmt.Errorf("unmarshal storage: file=%s, err=%s, no data, and clearing old mapping also failed: %v", file.Name(), err, e2)
-		}
-		return false, nil
+		return f.emptyStorage(file)
 	}
 
+	// UnmarshalBinary will have remapped the storage to newGen if it
+	// succeeded, or if it fails but the error is advisory-only. So we
+	// optimistically set the source here, but if there's a non-advisory
+	// error, we'll unmap it and then set the source to nil.
+	f.storage.SetSource(newGen)
 	if err := f.storage.UnmarshalBinary(data); err != nil {
 		// roaring can report advisory-only errors...
 		cause := errors.Cause(err)
 		_, ok := cause.(roaring.AdvisoryError)
 		if !ok {
 			_, e2 := f.storage.RemapRoaringStorage(nil)
+			f.storage.SetSource(nil)
 			if e2 != nil {
 				return false, fmt.Errorf("unmarshal storage: file=%s, err=%s, clearing old mapping also failed: %v", file.Name(), err, e2)
 			}
@@ -316,7 +335,9 @@ func (f *fragment) importStorage(data []byte, file *os.File, newGen generation, 
 	}
 	f.ops, f.opN = f.storage.Ops()
 	// For now, we assume that UnmarshalBinary will have mapped at least
-	// one container if we told it the storage was mapped, and we succeeded.
+	// one container if we told it the storage was mapped and it didn't
+	// error out. This might be wrong in occasional trivial cases, but
+	// it should be harmless.
 	return mapped, nil
 }
 
@@ -324,30 +345,8 @@ func (f *fragment) importStorage(data []byte, file *os.File, newGen generation, 
 // usable data. For instance, this would try to remap existing containers
 // to use a new storage as backing store.
 func (f *fragment) applyStorage(data []byte, file *os.File, newGen generation, mapped bool) (bool, error) {
-	f.storage.SetSource(newGen)
-	// we're moving to new storage, so instead of using the OpN
-	// derived from reading that storage, we notify the bitmap that
-	// OpN is now effectively zero. This might be wrong -- the apply won't
-	// process any ops, but in general, the only time we get called with
-	// applyStorage is when we already opened something, and are now
-	// reopening it, which we do only after snapshots, which means opN
-	// should be 0...
-	f.opN = 0
-	f.ops = 0
-	f.storage.SetOps(0, 0)
 	if len(data) == 0 {
-		// write the existing presumed-trivial storage out to the file
-		// so it's a valid Roaring file thereafter. nothing to unmarshal.
-		bi := bufio.NewWriter(file)
-		var err error
-		if _, err = f.storage.WriteTo(bi); err != nil {
-			return false, fmt.Errorf("init storage file: %s", err)
-		}
-		bi.Flush()
-		// RemapRoaringStorage will just unmap if it gets a nil pointer.
-		data = nil
-		// and we don't care about mapping in that case.
-		mapped = false
+		return f.emptyStorage(file)
 	}
 	// Tell storage to prefer mapping if and only if we think the data
 	// is mmapped and valid.
