@@ -19,6 +19,7 @@ package pilosa
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 )
@@ -121,6 +122,7 @@ func reportGenerations() []string {
 	knownGenerationLock.Lock()
 	defer knownGenerationLock.Unlock()
 	var surviving []string
+	times := make([]int64, 0, len(knownGenerations))
 	for id, span := range knownGenerations {
 		if span.to == timeZero {
 			if span.finalized == timeZero {
@@ -131,8 +133,25 @@ func reportGenerations() []string {
 		} else {
 			if span.finalized == timeZero {
 				surviving = append(surviving, fmt.Sprintf("%s: %v to %v, not finalized", id, span.from, span.to))
+			} else {
+				times = append(times, int64(span.finalized.Sub(span.to)))
 			}
 		}
+	}
+	if len(times) > 0 {
+		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+		var total int64
+		for _, d := range times {
+			total += d
+		}
+		var mean, median, p90, p99, worst int64
+		mean = total / int64(len(times))
+		median = times[len(times)/2]
+		p90 = times[(len(times)*9)/10]
+		p99 = times[(len(times)*99)/100]
+		worst = times[len(times)-1]
+		surviving = append(surviving, fmt.Sprintf("%d finalized spans. lag: mean %v, median %v, p90 %v, p99 %v, worst %v",
+			len(times), time.Duration(mean), time.Duration(median), time.Duration(p90), time.Duration(p99), time.Duration(worst)))
 	}
 	return surviving
 }

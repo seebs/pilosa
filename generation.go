@@ -184,6 +184,12 @@ func (m *mmapGeneration) Done() {
 	m.dead = true
 	m.deadSince = time.Now()
 	m.closeFile()
+	// If we're not debugging, the finalizer won't have been enabled
+	// previously. Finalizers have non-zero cost, so having them not be
+	// created until they're needed seems rewarding?
+	if !generationDebug {
+		runtime.SetFinalizer(m, generationFinalizer)
+	}
 	endGeneration(m.id)
 	// note, Done() doesn't close the file; only the finalizer actually
 	// does the shutdown.
@@ -302,7 +308,12 @@ func newGeneration(existing generation, path string, readData bool, setup func([
 	// possibly assign new generation ID if this one's been used, which can
 	// happen with reopens, especially during testing.
 	m.id = registerGeneration(m.id)
-	runtime.SetFinalizer(&m, generationFinalizer)
+	// if debugging, we always want the finalizer on so we notice if a
+	// generation is finalized without being closed. for non-debugging
+	// use, we only need it when the generation is closed.
+	if generationDebug {
+		runtime.SetFinalizer(&m, generationFinalizer)
+	}
 	// Mmap the underlying file so it can be zero copied.
 	var mapped bool
 	var data []byte
